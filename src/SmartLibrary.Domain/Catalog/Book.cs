@@ -1,10 +1,12 @@
+using SmartLibrary.Domain.Common;
+
 namespace SmartLibrary.Domain.Catalog;
 
 /// <summary>
 /// A bibliographic record — the tenant's local snapshot of book metadata.
 /// External sources (Google Books) are only ever a data source; this row is the storage.
 /// </summary>
-public class Book
+public class Book : IAuditable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
@@ -43,9 +45,13 @@ public class Book
 
     public MetadataSource MetadataSource { get; set; } = MetadataSource.Manual;
 
-    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAtUtc { get; set; }
+
+    public string? CreatedBy { get; set; }
 
     public DateTime? UpdatedAtUtc { get; set; }
+
+    public string? UpdatedBy { get; set; }
 
     public ICollection<BookCopy> Copies { get; set; } = [];
 }

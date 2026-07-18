@@ -1,9 +1,11 @@
+using SmartLibrary.Domain.Common;
+
 namespace SmartLibrary.Domain.Catalog;
 
 /// <summary>
 /// A physical (or licensed digital) copy of a <see cref="Book"/> that can circulate.
 /// </summary>
-public class BookCopy
+public class BookCopy : IAuditable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
@@ -18,8 +20,10 @@ public class BookCopy
     /// <summary>Physical shelf identifier within the branch (physical copies only).</summary>
     public string? ShelfNumber { get; set; }
 
-    /// <summary>Branch/shelf location. Becomes a proper Branch entity when locations are modeled.</summary>
-    public string? Location { get; set; }
+    /// <summary>The branch holding this copy. Null for digital items, which have no physical home.</summary>
+    public Guid? BranchId { get; set; }
+
+    public Branch? Branch { get; set; }
 
     /// <summary>Acquisition/replacement price, if tracked.</summary>
     public decimal? Price { get; set; }
@@ -31,4 +35,12 @@ public class BookCopy
     public DateTime AcquiredAtUtc { get; set; } = DateTime.UtcNow;
 
     public string? Notes { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; }
+
+    public string? CreatedBy { get; set; }
+
+    public DateTime? UpdatedAtUtc { get; set; }
+
+    public string? UpdatedBy { get; set; }
 }

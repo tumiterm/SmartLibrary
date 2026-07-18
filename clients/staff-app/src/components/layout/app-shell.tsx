@@ -27,9 +27,9 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { label: 'Dashboard', to: '/', icon: LayoutDashboard },
-  { label: 'Catalog', to: '/catalog/add', icon: Library },
-  { label: 'Circulation', to: '/circulation', icon: ArrowLeftRight, soon: true },
-  { label: 'Patrons', to: '/patrons', icon: Users, soon: true },
+  { label: 'Catalog', to: '/catalog', icon: Library },
+  { label: 'Circulation', to: '/circulation', icon: ArrowLeftRight },
+  { label: 'Patrons', to: '/patrons', icon: Users },
   { label: 'Reports', to: '/reports', icon: BarChart3, soon: true },
   { label: 'Settings', to: '/settings', icon: Settings, soon: true },
 ]

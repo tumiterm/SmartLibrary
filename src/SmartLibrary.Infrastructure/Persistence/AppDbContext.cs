@@ -3,6 +3,8 @@ using Finbuckle.MultiTenant.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SmartLibrary.Application.Abstractions;
 using SmartLibrary.Domain.Catalog;
+using SmartLibrary.Domain.Circulation;
+using SmartLibrary.Domain.Members;
 
 namespace SmartLibrary.Infrastructure.Persistence;
 
@@ -20,6 +22,18 @@ public class AppDbContext : MultiTenantDbContext, IUnitOfWork
     public DbSet<Book> Books => Set<Book>();
 
     public DbSet<BookCopy> BookCopies => Set<BookCopy>();
+
+    public DbSet<Branch> Branches => Set<Branch>();
+
+    public DbSet<Member> Members => Set<Member>();
+
+    public DbSet<Loan> Loans => Set<Loan>();
+
+    public DbSet<Fine> Fines => Set<Fine>();
+
+    public DbSet<Hold> Holds => Set<Hold>();
+
+    public DbSet<BranchTransfer> BranchTransfers => Set<BranchTransfer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

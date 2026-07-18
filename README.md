@@ -41,9 +41,37 @@ Dependencies point inward only: `Api → Infrastructure → Application → Doma
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/v1/books/isbn/{isbn}` | Add-book lookup flow: local DB → Google Books → `NotFound` (manual entry). Accepts ISBN-10 or -13, hyphens ok. `existsInLibrary: false` = show "Add book". |
-| `POST /api/v1/books` | Save the local snapshot (prefilled or manual). 409 if the ISBN is already in this tenant's catalog. |
+| `GET /api/v1/books/isbn/{isbn}` | Lookup flow: local DB → Google Books → `NotFound` (manual entry). **External hits are snapshotted into the catalog automatically** — an ISBN never hits Google twice per tenant. Returns availability counts. |
+| `GET /api/v1/books/{id}` | Full record: metadata, cover, classification, copies per branch with availability, borrow history (empty until circulation). |
+| `POST /api/v1/books` | Manual entry (the final fallback). 409 on duplicate ISBN. |
+| `PUT /api/v1/books/{id}` | Complete/correct a record (e.g. right after an external lookup cached it). ISBN immutable. |
+| `POST /api/v1/books/{id}/copies` | Register a circulating copy: barcode (unique/tenant), branch (physical only), shelf no., condition, price. |
+| `GET/POST /api/v1/branches` | Branch list / creation. Physical copies belong to a branch; digital items don't. |
+| `GET /api/v1/members?search=` | Search members by name, email or card number (top 50). |
+| `GET /api/v1/members/{id}` | Member details incl. card data and audit info. |
+| `POST /api/v1/members` | Register a patron (library-wide or on a home branch); issues a unique `M-YYYY-NNNNNN` card number, 1-year expiry. 409 on duplicate email. |
+| `GET /api/v1/loans/active` | Active loans, soonest due first. |
+| `POST /api/v1/loans` | Checkout by scan: membership number + copy barcode. Refuses suspended/expired members, unavailable copies, >5 active loans, or ≥ R100 owed. |
+| `POST /api/v1/loans/return` | Return by barcode scan; assesses an overdue fine (R5/day) automatically when late. |
+| `POST /api/v1/loans/fines/{id}/settle` | Pay or waive a fine. |
 | `GET /health` | Liveness. |
+
+Circulation policy (loan days, fine rate, loan cap, fine block threshold) lives in the
+`Circulation` section of appsettings.
+
+### Reader Score
+
+Every member profile carries a 0–100 behavioural reputation with bookish tiers
+(Laureate / Scholar / Reader / Drifter / Truant), computed in
+`Domain/Members/ReaderScore.cs` from on-time return rate, currently-overdue books, and
+unpaid fines. Every deduction is returned as a human-readable reason — explainable, not
+a black box. New members start at 100.
+
+### Auditing
+
+All entities implement `IAuditable`; an EF `SaveChangesInterceptor` stamps
+`CreatedAtUtc/CreatedBy/UpdatedAtUtc/UpdatedBy` automatically. The acting user comes from
+`ICurrentUserService` — hardcoded to `librarian@demo` until auth lands, then it reads JWT claims.
 
 All catalog requests require a tenant — send `X-Tenant: demo` (dev tenants live in
 `appsettings.Development.json` under `Finbuckle:MultiTenant`).

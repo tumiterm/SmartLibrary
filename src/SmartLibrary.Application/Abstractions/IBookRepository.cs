@@ -14,6 +14,16 @@ public interface IBookRepository
 
     Task<bool> BarcodeExistsAsync(string barcode, CancellationToken cancellationToken);
 
+    Task<BookCopy?> GetCopyByBarcodeAsync(string barcode, CancellationToken cancellationToken);
+
+    /// <summary>Paged catalog search over title/authors/ISBN, with copies loaded. Newest first.</summary>
+    Task<(IReadOnlyList<Book> Books, int TotalCount)> SearchAsync(
+        string? search,
+        BookFormat? format,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken);
+
     void Add(Book book);
 
     void AddCopy(BookCopy copy);

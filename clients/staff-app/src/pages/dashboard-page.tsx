@@ -34,17 +34,25 @@ export function DashboardPage() {
           </Card>
         </Link>
 
-        <Card className="animate-rise opacity-60 [animation-delay:60ms]">
-          <CardContent className="flex h-full flex-col gap-3">
-            <div className="grid size-10 place-items-center rounded-lg bg-surface-2 text-muted">
-              <Library className="size-5" />
-            </div>
-            <p className="font-medium">Browse catalog</p>
-            <p className="text-sm leading-relaxed text-muted">
-              Faceted search across your collection. Coming in the next slice.
-            </p>
-          </CardContent>
-        </Card>
+        <Link
+          to="/catalog"
+          className="group animate-rise rounded-2xl [animation-delay:60ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          <Card className="h-full transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-pop">
+            <CardContent className="flex h-full flex-col gap-3">
+              <div className="grid size-10 place-items-center rounded-lg bg-accent-soft text-accent">
+                <Library className="size-5" />
+              </div>
+              <p className="font-medium">Browse catalog</p>
+              <p className="text-sm leading-relaxed text-muted">
+                Search your collection by title, ISBN or publisher.
+              </p>
+              <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-accent">
+                Browse <ArrowRight className="size-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
+              </span>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card className="animate-rise opacity-60 [animation-delay:120ms]">
           <CardContent className="flex h-full flex-col gap-3">

@@ -56,7 +56,6 @@ public sealed class UpdateBookCommandHandler(IBookRepository books, IUnitOfWork 
         book.CoverImageUrl = request.CoverImageUrl;
         book.ClassificationNumber = request.ClassificationNumber?.Trim();
         book.Format = request.Format;
-        book.UpdatedAtUtc = DateTime.UtcNow;
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }

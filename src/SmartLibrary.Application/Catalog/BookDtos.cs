@@ -7,14 +7,22 @@ public sealed record BookCopyDto(
     string Barcode,
     string? ShelfNumber,
     string? CallNumber,
-    string? Location,
+    Guid? BranchId,
+    string? BranchName,
     string Status,
     string Condition,
     decimal? Price,
     DateTime AcquiredAtUtc,
     string? Notes);
 
-/// <summary>Placeholder loan shape until the circulation module lands — always empty for now.</summary>
+public sealed record HoldQueueItemDto(
+    Guid Id,
+    string MemberName,
+    string MembershipNumber,
+    string Status,
+    DateTime PlacedAtUtc,
+    int Position);
+
 public sealed record LoanSummaryDto(
     Guid Id,
     string PatronName,
@@ -43,9 +51,13 @@ public sealed record BookDetailsDto(
     int CopiesTotal,
     int CopiesAvailable,
     IReadOnlyList<BookCopyDto> Copies,
-    IReadOnlyList<LoanSummaryDto> BorrowHistory)
+    IReadOnlyList<LoanSummaryDto> BorrowHistory,
+    IReadOnlyList<HoldQueueItemDto> Holds)
 {
-    public static BookDetailsDto FromEntity(Book book)
+    public static BookDetailsDto FromEntity(
+        Book book,
+        IReadOnlyList<LoanSummaryDto>? borrowHistory = null,
+        IReadOnlyList<HoldQueueItemDto>? holds = null)
     {
         var copies = book.Copies
             .OrderBy(c => c.AcquiredAtUtc)
@@ -54,7 +66,8 @@ public sealed record BookDetailsDto(
                 c.Barcode,
                 c.ShelfNumber,
                 c.CallNumber,
-                c.Location,
+                c.BranchId,
+                c.Branch?.Name,
                 c.Status.ToString(),
                 c.Condition.ToString(),
                 c.Price,
@@ -83,6 +96,7 @@ public sealed record BookDetailsDto(
             CopiesTotal: copies.Count,
             CopiesAvailable: book.Copies.Count(c => c.Status == CopyStatus.Available),
             Copies: copies,
-            BorrowHistory: []);
+            BorrowHistory: borrowHistory ?? [],
+            Holds: holds ?? []);
     }
 }

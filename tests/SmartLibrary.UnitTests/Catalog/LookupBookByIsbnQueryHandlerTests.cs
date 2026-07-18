@@ -111,6 +111,17 @@ public class LookupBookByIsbnQueryHandlerTests
         public Task<bool> BarcodeExistsAsync(string barcode, CancellationToken cancellationToken) =>
             Task.FromResult(false);
 
+        public Task<BookCopy?> GetCopyByBarcodeAsync(string barcode, CancellationToken cancellationToken) =>
+            Task.FromResult<BookCopy?>(null);
+
+        public Task<(IReadOnlyList<Book> Books, int TotalCount)> SearchAsync(
+            string? search,
+            BookFormat? format,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<(IReadOnlyList<Book>, int)>(([], 0));
+
         public void Add(Book entity) => LastAdded = entity;
 
         public void AddCopy(BookCopy copy)
@@ -121,7 +132,7 @@ public class LookupBookByIsbnQueryHandlerTests
     private sealed class FakeMetadataProvider(ExternalBookMetadata? metadata) : IBookMetadataProvider
     {
         public Task<ExternalBookMetadata?> LookupByIsbn13Async(string isbn13, CancellationToken cancellationToken) =>
-            Task.FromResult(metadata)
+            Task.FromResult(metadata);
     }
 
     private sealed class FakeUnitOfWork : IUnitOfWork

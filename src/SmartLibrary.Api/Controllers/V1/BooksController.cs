@@ -6,7 +6,9 @@ using SmartLibrary.Application.Catalog.AddBook;
 using SmartLibrary.Application.Catalog.AddBookCopy;
 using SmartLibrary.Application.Catalog.GetBookDetails;
 using SmartLibrary.Application.Catalog.Lookup;
+using SmartLibrary.Application.Catalog.SearchBooks;
 using SmartLibrary.Application.Catalog.UpdateBook;
+using SmartLibrary.Application.Common.Models;
 using SmartLibrary.Domain.Catalog;
 
 namespace SmartLibrary.Api.Controllers.V1;
@@ -26,6 +28,17 @@ public sealed class BooksController(ISender sender) : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<BookLookupResult>> LookupByIsbn(string isbn, CancellationToken cancellationToken) =>
         Ok(await sender.Send(new LookupBookByIsbnQuery(isbn), cancellationToken));
+
+    /// <summary>Paged catalog search over title/subtitle/ISBN/publisher, optionally filtered by format.</summary>
+    [HttpGet]
+    [ProducesResponseType<PagedResult<BookListItemDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedResult<BookListItemDto>>> Search(
+        [FromQuery] string? search,
+        [FromQuery] BookFormat? format,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default) =>
+        Ok(await sender.Send(new SearchBooksQuery(search, format, page, pageSize), cancellationToken));
 
     /// <summary>Full record: metadata, cover, copies with availability, borrow history.</summary>
     [HttpGet("{id:guid}")]
@@ -103,7 +116,7 @@ public sealed class BooksController(ISender sender) : ControllerBase
                 request.Barcode,
                 request.ShelfNumber,
                 request.CallNumber,
-                request.Location,
+                request.BranchId,
                 request.Condition,
                 request.Price,
                 request.Notes),
@@ -147,7 +160,7 @@ public sealed record AddBookCopyRequest(
     string Barcode,
     string? ShelfNumber,
     string? CallNumber,
-    string? Location,
+    Guid? BranchId,
     CopyCondition Condition = CopyCondition.Good,
     decimal? Price = null,
     string? Notes = null);

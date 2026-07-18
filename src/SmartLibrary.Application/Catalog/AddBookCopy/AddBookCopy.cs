@@ -11,7 +11,7 @@ public sealed record AddBookCopyCommand(
     string Barcode,
     string? ShelfNumber,
     string? CallNumber,
-    string? Location,
+    Guid? BranchId,
     CopyCondition Condition,
     decimal? Price,
     string? Notes) : IRequest<Guid>;
@@ -23,20 +23,27 @@ public sealed class AddBookCopyCommandValidator : AbstractValidator<AddBookCopyC
         RuleFor(c => c.Barcode).NotEmpty().MaximumLength(100);
         RuleFor(c => c.ShelfNumber).MaximumLength(50);
         RuleFor(c => c.CallNumber).MaximumLength(100);
-        RuleFor(c => c.Location).MaximumLength(200);
         RuleFor(c => c.Condition).IsInEnum();
         RuleFor(c => c.Price).GreaterThanOrEqualTo(0).When(c => c.Price.HasValue);
         RuleFor(c => c.Notes).MaximumLength(2000);
     }
 }
 
-public sealed class AddBookCopyCommandHandler(IBookRepository books, IUnitOfWork unitOfWork)
+public sealed class AddBookCopyCommandHandler(
+    IBookRepository books,
+    IBranchRepository branches,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<AddBookCopyCommand, Guid>
 {
     public async Task<Guid> Handle(AddBookCopyCommand request, CancellationToken cancellationToken)
     {
         var book = await books.GetByIdAsync(request.BookId, cancellationToken)
             ?? throw new NotFoundException($"Book {request.BookId} was not found.");
+
+        if (request.BranchId is { } branchId && !await branches.ExistsAsync(branchId, cancellationToken))
+        {
+            throw new NotFoundException($"Branch {branchId} was not found.");
+        }
 
         var barcode = request.Barcode.Trim();
         if (await books.BarcodeExistsAsync(barcode, cancellationToken))
@@ -50,7 +57,7 @@ public sealed class AddBookCopyCommandHandler(IBookRepository books, IUnitOfWork
             Barcode = barcode,
             ShelfNumber = request.ShelfNumber?.Trim(),
             CallNumber = request.CallNumber?.Trim(),
-            Location = request.Location?.Trim(),
+            BranchId = request.BranchId,
             Condition = request.Condition,
             Price = request.Price,
             Notes = request.Notes,
