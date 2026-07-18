@@ -1,0 +1,6 @@
+# Test-project analyzer adjustments (inherits the root .editorconfig).
+root = false
+
+[*.cs]
+# Underscored test method names (Given_When_Then style) are the xUnit convention.
+dotnet_diagnostic.CA1707.severity = none

@@ -1,0 +1,152 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ─── SmartLibrary design tokens · "Ink & Brass" ─────────────────────────────
+   Light = warm paper & ink. Dark = candlelit near-black. One brass accent.
+   Every component reads these — never hard-code a color in a component.     */
+
+:root {
+  --background: #f6f4ef;
+  --surface: #ffffff;
+  --surface-2: #fbfaf6;
+  --border: #e5e1d6;
+  --border-strong: #d4cec0;
+  --ink: #1c1a16;
+  --muted: #6f6859;
+  --faint: #a49c8b;
+  --primary: #1c1a16;
+  --primary-foreground: #f6f4ef;
+  --accent: #96770f;
+  --accent-soft: #f2e9d2;
+  --success: #2b6e4c;
+  --success-soft: #e3efe7;
+  --danger: #a33929;
+  --danger-soft: #f7e6e1;
+  --ring: #96770f;
+  --shadow-card: 0 1px 2px rgb(28 26 22 / 0.05), 0 10px 28px -14px rgb(28 26 22 / 0.14);
+  --shadow-pop: 0 2px 6px rgb(28 26 22 / 0.08), 0 20px 44px -16px rgb(28 26 22 / 0.22);
+}
+
+.dark {
+  --background: #12100d;
+  --surface: #1a1815;
+  --surface-2: #201d19;
+  --border: #2b2822;
+  --border-strong: #3a352c;
+  --ink: #ece7dc;
+  --muted: #a89f8c;
+  --faint: #6f695c;
+  --primary: #ece7dc;
+  --primary-foreground: #14120f;
+  --accent: #d9a62e;
+  --accent-soft: #2c2517;
+  --success: #63b287;
+  --success-soft: #17281f;
+  --danger: #d97a63;
+  --danger-soft: #301b16;
+  --ring: #d9a62e;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px -14px rgb(0 0 0 / 0.55);
+  --shadow-pop: 0 2px 6px rgb(0 0 0 / 0.45), 0 24px 52px -18px rgb(0 0 0 / 0.7);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-ring: var(--ring);
+
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces Variable', ui-serif, Georgia, serif;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+
+  --animate-rise: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade: fade 0.35s ease both;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--accent-soft);
+    color: var(--ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Understated scrollbars that match the theme */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+    font-variation-settings: 'opsz' 40;
+    letter-spacing: -0.015em;
+  }
+
+  /* Soft top wash that gives pages depth without a hard gradient */
+  .page-wash {
+    background-image: radial-gradient(
+      1100px 420px at 18% -8%,
+      color-mix(in oklab, var(--accent) 7%, transparent),
+      transparent 70%
+    );
+  }
+}
