@@ -41,6 +41,7 @@ function BookForm({ initial, isbn, mode, bookId, onDone }: BookFormProps) {
   const [description, setDescription] = useState(initial?.description ?? '')
   const [classification, setClassification] = useState(initial?.classificationNumber ?? '')
   const [format, setFormat] = useState<BookFormat>('Print')
+  const [referenceOnly, setReferenceOnly] = useState(false)
 
   const splitList = (value: string) =>
     value
@@ -61,6 +62,7 @@ function BookForm({ initial, isbn, mode, bookId, onDone }: BookFormProps) {
     coverImageUrl: initial?.coverImageUrl ?? null,
     classificationNumber: classification.trim() || null,
     format,
+    isReferenceOnly: referenceOnly,
   })
 
   const mutation = useMutation({
@@ -187,6 +189,16 @@ function BookForm({ initial, isbn, mode, bookId, onDone }: BookFormProps) {
         <Label htmlFor="description">Description</Label>
         <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} />
       </div>
+
+      <label className="flex cursor-pointer items-center gap-2.5 text-sm text-muted">
+        <input
+          type="checkbox"
+          className="size-4 accent-(--accent)"
+          checked={referenceOnly}
+          onChange={(e) => setReferenceOnly(e.target.checked)}
+        />
+        Reference only — this title never leaves the library
+      </label>
 
       <div className="flex items-center justify-end gap-3 border-t border-border pt-5">
         <Button type="submit" size="lg" disabled={mutation.isPending || !title.trim()}>

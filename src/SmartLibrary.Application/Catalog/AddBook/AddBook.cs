@@ -24,7 +24,8 @@ public sealed record AddBookCommand(
     string? CoverImageUrl,
     string? ClassificationNumber,
     BookFormat Format,
-    MetadataSource MetadataSource) : IRequest<Guid>;
+    MetadataSource MetadataSource,
+    bool IsReferenceOnly = false) : IRequest<Guid>;
 
 public sealed class AddBookCommandValidator : AbstractValidator<AddBookCommand>
 {
@@ -75,6 +76,7 @@ public sealed class AddBookCommandHandler(IBookRepository books, IUnitOfWork uni
             CoverImageUrl = request.CoverImageUrl,
             ClassificationNumber = request.ClassificationNumber?.Trim(),
             Format = request.Format,
+            IsReferenceOnly = request.IsReferenceOnly,
             MetadataSource = request.MetadataSource,
         };
 

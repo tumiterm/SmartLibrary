@@ -18,6 +18,12 @@ public sealed class CirculationOptions
 
     /// <summary>Days a member has to collect a ready reservation before it expires.</summary>
     public int HoldPickupDays { get; set; } = 3;
+
+    /// <summary>A title flags as low stock when its available copies drop to this count or below.</summary>
+    public int LowStockThreshold { get; set; } = 2;
+
+    /// <summary>Checkout is refused when the member has this many overdue items.</summary>
+    public int MaxOverdueItems { get; set; } = 1;
 }
 
 /// <summary>

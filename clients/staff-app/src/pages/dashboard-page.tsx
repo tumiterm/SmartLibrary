@@ -5,6 +5,7 @@ import {
   ArrowRight,
   ArrowUpFromLine,
   BookPlus,
+  PackageOpen,
   Users,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -160,6 +161,38 @@ export function DashboardPage() {
             </Card>
 
             <div className="flex flex-col gap-4">
+              {dashboard.data.lowStock.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <PackageOpen className="size-4 text-danger" />
+                      Running low
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="flex flex-col gap-2 text-sm">
+                      {dashboard.data.lowStock.map((item) => (
+                        <li key={item.bookId} className="flex items-center justify-between gap-2">
+                          <Link
+                            to={`/catalog/books/${item.bookId}`}
+                            className="min-w-0 truncate font-medium text-ink hover:text-accent"
+                          >
+                            {item.title}
+                          </Link>
+                          <span
+                            className={cn(
+                              'shrink-0 text-xs',
+                              item.available === 0 ? 'font-semibold text-danger' : 'text-muted',
+                            )}
+                          >
+                            {item.available} of {item.total} left
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
               {[
                 { to: '/catalog/add', icon: BookPlus, label: 'Add a book', sub: 'ISBN lookup or manual entry' },
                 { to: '/circulation', icon: AlarmClock, label: 'The desk', sub: 'Check out, return, renew, transfer' },

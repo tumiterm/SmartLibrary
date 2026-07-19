@@ -31,6 +31,8 @@ public sealed class CirculationPolicyProvider(
                 FineBlockThreshold = row.FineBlockThreshold,
                 MaxRenewals = row.MaxRenewals,
                 HoldPickupDays = row.HoldPickupDays,
+                LowStockThreshold = row.LowStockThreshold,
+                MaxOverdueItems = row.MaxOverdueItems,
             };
 
         return _cached;

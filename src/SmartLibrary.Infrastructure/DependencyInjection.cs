@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IHoldRepository, HoldRepository>();
         services.AddScoped<ITransferRepository, TransferRepository>();
         services.AddScoped<ILibrarySettingsRepository, LibrarySettingsRepository>();
+        services.AddScoped<IStocktakeRepository, StocktakeRepository>();
         services.AddScoped<IDashboardRepository, DashboardRepository>();
 
         services.Configure<CirculationOptions>(configuration.GetSection(CirculationOptions.SectionName));

@@ -15,12 +15,15 @@ public sealed record SetCopyStatusCommand(Guid CopyId, CopyStatus Status) : IReq
 public sealed class SetCopyStatusCommandHandler(IBookRepository books, IUnitOfWork unitOfWork)
     : IRequestHandler<SetCopyStatusCommand>
 {
-    private static readonly CopyStatus[] ManualStatuses =
-        [CopyStatus.Available, CopyStatus.Lost, CopyStatus.Damaged, CopyStatus.Withdrawn];
+    private static readonly CopyStatus[] ManualTargets =
+        [CopyStatus.Available, CopyStatus.Lost, CopyStatus.Damaged, CopyStatus.Withdrawn, CopyStatus.Disposed];
+
+    /// <summary>States staff may change from — Missing (set by stocktake) is restorable here too.</summary>
+    private static readonly CopyStatus[] ChangeableFrom = [.. ManualTargets, CopyStatus.Missing];
 
     public async Task Handle(SetCopyStatusCommand request, CancellationToken cancellationToken)
     {
-        if (!ManualStatuses.Contains(request.Status))
+        if (!ManualTargets.Contains(request.Status))
         {
             throw new ConflictException($"{request.Status} is set by circulation, not manually.");
         }
@@ -28,7 +31,7 @@ public sealed class SetCopyStatusCommandHandler(IBookRepository books, IUnitOfWo
         var copy = await books.GetCopyByIdAsync(request.CopyId, cancellationToken)
             ?? throw new NotFoundException($"Copy {request.CopyId} was not found.");
 
-        if (!ManualStatuses.Contains(copy.Status))
+        if (!ChangeableFrom.Contains(copy.Status))
         {
             throw new ConflictException(
                 $"Copy {copy.Barcode} is {copy.Status} — resolve that through circulation first.");

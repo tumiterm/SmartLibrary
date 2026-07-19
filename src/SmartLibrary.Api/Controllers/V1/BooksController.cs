@@ -71,7 +71,8 @@ public sealed class BooksController(ISender sender) : ControllerBase
                 request.CoverImageUrl,
                 request.ClassificationNumber,
                 request.Format,
-                request.MetadataSource),
+                request.MetadataSource,
+                request.IsReferenceOnly),
             cancellationToken);
 
         return CreatedAtAction(nameof(GetById), new { id, version = "1" }, new { id });
@@ -98,7 +99,8 @@ public sealed class BooksController(ISender sender) : ControllerBase
                 request.Categories ?? [],
                 request.CoverImageUrl,
                 request.ClassificationNumber,
-                request.Format),
+                request.Format,
+                request.IsReferenceOnly),
             cancellationToken);
 
         return NoContent();
@@ -158,7 +160,8 @@ public sealed record AddBookRequest(
     string? CoverImageUrl,
     string? ClassificationNumber,
     BookFormat Format = BookFormat.Print,
-    MetadataSource MetadataSource = MetadataSource.Manual);
+    MetadataSource MetadataSource = MetadataSource.Manual,
+    bool IsReferenceOnly = false);
 
 public sealed record UpdateBookRequest(
     string Title,
@@ -172,7 +175,8 @@ public sealed record UpdateBookRequest(
     IReadOnlyList<string>? Categories,
     string? CoverImageUrl,
     string? ClassificationNumber,
-    BookFormat Format = BookFormat.Print);
+    BookFormat Format = BookFormat.Print,
+    bool IsReferenceOnly = false);
 
 public sealed record AddBookCopyRequest(
     string Barcode,

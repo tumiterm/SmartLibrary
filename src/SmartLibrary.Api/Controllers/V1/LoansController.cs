@@ -5,8 +5,10 @@ using SmartLibrary.Application.Circulation;
 using SmartLibrary.Application.Circulation.CheckoutBook;
 using SmartLibrary.Application.Circulation.GetActiveLoans;
 using SmartLibrary.Application.Circulation.RenewLoan;
+using SmartLibrary.Application.Circulation.ReportLostBook;
 using SmartLibrary.Application.Circulation.ReturnBook;
 using SmartLibrary.Application.Circulation.SettleFine;
+using SmartLibrary.Domain.Catalog;
 
 namespace SmartLibrary.Api.Controllers.V1;
 
@@ -32,19 +34,34 @@ public sealed class LoansController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await sender.Send(
-            new CheckoutBooksCommand(request.MembershipNumber, request.Barcodes),
+            new CheckoutBooksCommand(request.MembershipNumber, request.Barcodes, request.BranchId),
             cancellationToken);
 
         return CreatedAtAction(nameof(GetActive), new { version = "1" }, result);
     }
 
-    /// <summary>Return: one barcode scan finds and closes the active loan; assesses an overdue fine when late.</summary>
+    /// <summary>
+    /// Return against the active loan: records when/where it came back, judges condition
+    /// (normal or damaged with an optional charge), assesses overdue fines, closes the loan.
+    /// The borrowing record is permanent.
+    /// </summary>
     [HttpPost("return")]
     [ProducesResponseType<ReturnResultDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ReturnResultDto>> Return(ReturnRequest request, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ReturnBookCommand(request.Barcode), cancellationToken));
+        Ok(await sender.Send(
+            new ReturnBookCommand(request.Barcode, request.Outcome, request.Condition, request.DamageCharge, request.BranchId),
+            cancellationToken));
+
+    /// <summary>Writes a loaned copy off as lost: closes the loan, marks the copy Lost, raises a replacement charge.</summary>
+    [HttpPost("lost")]
+    [ProducesResponseType<LostBookResultDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<LostBookResultDto>> ReportLost(
+        ReportLostRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ReportLostBookCommand(request.Barcode, request.ReplacementCharge), cancellationToken));
 
     /// <summary>Renew by barcode: refused when overdue, at the renewal limit, or when the waitlist has claims.</summary>
     [HttpPost("renew")]
@@ -66,8 +83,18 @@ public sealed class LoansController(ISender sender) : ControllerBase
         Ok(await sender.Send(new SettleFineCommand(fineId, request.Waive, request.Reason), cancellationToken));
 }
 
-public sealed record CheckoutRequest(string MembershipNumber, IReadOnlyList<string> Barcodes);
+public sealed record CheckoutRequest(
+    string MembershipNumber,
+    IReadOnlyList<string> Barcodes,
+    Guid? BranchId = null);
 
-public sealed record ReturnRequest(string Barcode);
+public sealed record ReturnRequest(
+    string Barcode,
+    ReturnOutcome Outcome = ReturnOutcome.Normal,
+    CopyCondition? Condition = null,
+    decimal? DamageCharge = null,
+    Guid? BranchId = null);
+
+public sealed record ReportLostRequest(string Barcode, decimal? ReplacementCharge = null);
 
 public sealed record SettleFineRequest(bool Waive = false, string? Reason = null);

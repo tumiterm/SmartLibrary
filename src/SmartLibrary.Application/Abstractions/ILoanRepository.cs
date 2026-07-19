@@ -9,6 +9,11 @@ public interface ILoanRepository
 
     Task<int> CountActiveByMemberAsync(Guid memberId, CancellationToken cancellationToken);
 
+    /// <summary>True when the member already has any copy of this title out.</summary>
+    Task<bool> HasActiveLoanForBookAsync(Guid memberId, Guid bookId, CancellationToken cancellationToken);
+
+    Task<int> CountOverdueByMemberAsync(Guid memberId, DateTime nowUtc, CancellationToken cancellationToken);
+
     /// <summary>All loans for a member, newest first. Includes copy + book.</summary>
     Task<IReadOnlyList<Loan>> GetByMemberAsync(Guid memberId, CancellationToken cancellationToken);
 

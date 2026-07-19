@@ -11,7 +11,15 @@ import { Spinner } from '@/components/ui/spinner'
 import { getSettings, updateSettings } from '@/lib/api'
 
 interface Field {
-  key: 'loanDays' | 'dailyFineAmount' | 'maxActiveLoans' | 'fineBlockThreshold' | 'maxRenewals' | 'holdPickupDays'
+  key:
+    | 'loanDays'
+    | 'dailyFineAmount'
+    | 'maxActiveLoans'
+    | 'fineBlockThreshold'
+    | 'maxRenewals'
+    | 'holdPickupDays'
+    | 'lowStockThreshold'
+    | 'maxOverdueItems'
   label: string
   hint: string
   step?: string
@@ -24,6 +32,8 @@ const FIELDS: Field[] = [
   { key: 'dailyFineAmount', label: 'Fine per overdue day', hint: 'Charged automatically at return.', step: '0.50' },
   { key: 'fineBlockThreshold', label: 'Fine block threshold', hint: 'Borrowing stops at this amount owed.', step: '10' },
   { key: 'holdPickupDays', label: 'Reservation pickup days', hint: 'Days to collect before a hold expires.' },
+  { key: 'lowStockThreshold', label: 'Low-stock threshold', hint: 'Flag titles when available copies drop this low.' },
+  { key: 'maxOverdueItems', label: 'Overdue items to block', hint: 'Borrowing stops at this many overdue books.' },
 ]
 
 export function SettingsPage() {
@@ -36,6 +46,8 @@ export function SettingsPage() {
     fineBlockThreshold: '',
     maxRenewals: '',
     holdPickupDays: '',
+    lowStockThreshold: '',
+    maxOverdueItems: '',
   })
 
   useEffect(() => {
@@ -47,6 +59,8 @@ export function SettingsPage() {
         fineBlockThreshold: String(settings.data.fineBlockThreshold),
         maxRenewals: String(settings.data.maxRenewals),
         holdPickupDays: String(settings.data.holdPickupDays),
+        lowStockThreshold: String(settings.data.lowStockThreshold),
+        maxOverdueItems: String(settings.data.maxOverdueItems),
       })
     }
   }, [settings.data])
@@ -60,6 +74,8 @@ export function SettingsPage() {
         fineBlockThreshold: Number(values.fineBlockThreshold),
         maxRenewals: Number(values.maxRenewals),
         holdPickupDays: Number(values.holdPickupDays),
+        lowStockThreshold: Number(values.lowStockThreshold),
+        maxOverdueItems: Number(values.maxOverdueItems),
       }),
     onSuccess: () => {
       toast.success('Library rules saved', { description: 'They apply to every checkout from now on.' })

@@ -51,13 +51,23 @@ Dependencies point inward only: `Api → Infrastructure → Application → Doma
 | `GET /api/v1/members/{id}` | Member details incl. card data and audit info. |
 | `POST /api/v1/members` | Register a patron (library-wide or on a home branch); issues a unique `M-YYYY-NNNNNN` card number, 1-year expiry. 409 on duplicate email. |
 | `GET /api/v1/loans/active` | Active loans, soonest due first. |
-| `POST /api/v1/loans` | Checkout by scan: membership number + copy barcode. Refuses suspended/expired members, unavailable copies, >5 active loans, or ≥ R100 owed. |
-| `POST /api/v1/loans/return` | Return by barcode scan; assesses an overdue fine (R5/day) automatically when late. |
-| `POST /api/v1/loans/fines/{id}/settle` | Pay or waive a fine. |
+| `POST /api/v1/loans` | Checkout by scan: card + one or many barcodes (one transaction, per-copy failures reported). The full rulebook: active same-tenant member, loan cap, overdue-items cap, fine threshold, copy Available & at the desk's branch, not reserved for someone else, not reference-only, **one copy per title per member**. |
+| `POST /api/v1/loans/return` | Return against the active loan only: records return time + receiving branch, judges condition (normal/damaged + optional charge), assesses overdue fines, feeds the waitlist. The borrowing record is permanent. |
+| `POST /api/v1/loans/lost` | Write a loaned copy off as lost: loan closed (history kept), copy → Lost, replacement charge (explicit or copy price). |
+| `POST /api/v1/loans/renew` | Renew by barcode; refused when overdue, at the renewal limit, or when members are waiting. |
+| `POST /api/v1/loans/fines/{id}/settle` | Pay, or waive **with a required reason**. |
+| `GET/POST /api/v1/holds`, `POST /api/v1/holds/{id}/cancel` | Waitlist: place/cancel; ready holds expire after the pickup window (lazy sweep). |
+| `POST /api/v1/transfers` + `/{id}/action` + `/receive` + `/history` | Full transfer workflow: Requested → Dispatch → InTransit → Received, plus Reject/Cancel/LostInTransit/DamagedInTransit. Copy is unborrowable until received; permanent history with actors and timestamps. |
+| `POST/GET /api/v1/stocktakes` + `/{id}/scans` + `/{id}/complete` | Stocktake: start (branch or whole library), scan copies in, complete. Unscanned expected copies → Missing; scanning a Lost/Missing copy recovers it. Statuses adjust, history never deletes. |
+| `POST /api/v1/books/copies/{id}/status` | Mark a copy Lost/Damaged/Withdrawn or restore it. |
+| `PUT /api/v1/members/{id}`, `POST .../status` | Edit a member; suspend/reactivate. |
+| `GET/PUT /api/v1/settings` | **Per-tenant library rules** (loan days, fine rate, caps, pickup window) overriding platform defaults. |
+| `GET /api/v1/dashboard` | Stats + recent circulation activity. |
+| `GET /api/v1/search?q=` | Global search: books (title/author/ISBN), copies (barcode), members (name/card/email). |
 | `GET /health` | Liveness. |
 
-Circulation policy (loan days, fine rate, loan cap, fine block threshold) lives in the
-`Circulation` section of appsettings.
+Platform-default circulation policy lives in the `Circulation` section of appsettings;
+each tenant can override it via `PUT /settings` (Settings page in the staff app).
 
 ### Reader Score
 

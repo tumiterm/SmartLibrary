@@ -24,6 +24,11 @@ public sealed class LoanConfiguration : IEntityTypeConfiguration<Loan>
             .HasForeignKey(l => l.BookCopyId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(l => l.ReturnBranch)
+            .WithMany()
+            .HasForeignKey(l => l.ReturnBranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Fast "is this copy out?" and "member's active loans" lookups.
         builder.HasIndex(l => new { l.BookCopyId, l.ReturnedAtUtc });
         builder.HasIndex(l => new { l.MemberId, l.ReturnedAtUtc });

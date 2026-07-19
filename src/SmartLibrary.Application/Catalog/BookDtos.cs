@@ -47,9 +47,11 @@ public sealed record BookDetailsDto(
     string? ClassificationNumber,
     string Format,
     string MetadataSource,
+    bool IsReferenceOnly,
     DateTime CreatedAtUtc,
     int CopiesTotal,
     int CopiesAvailable,
+    bool IsLowStock,
     IReadOnlyList<BookCopyDto> Copies,
     IReadOnlyList<LoanSummaryDto> BorrowHistory,
     IReadOnlyList<HoldQueueItemDto> Holds)
@@ -57,7 +59,8 @@ public sealed record BookDetailsDto(
     public static BookDetailsDto FromEntity(
         Book book,
         IReadOnlyList<LoanSummaryDto>? borrowHistory = null,
-        IReadOnlyList<HoldQueueItemDto>? holds = null)
+        IReadOnlyList<HoldQueueItemDto>? holds = null,
+        int? lowStockThreshold = null)
     {
         var copies = book.Copies
             .OrderBy(c => c.AcquiredAtUtc)
@@ -74,6 +77,8 @@ public sealed record BookDetailsDto(
                 c.AcquiredAtUtc,
                 c.Notes))
             .ToList();
+
+        var available = book.Copies.Count(c => c.Status == CopyStatus.Available);
 
         return new BookDetailsDto(
             book.Id,
@@ -92,9 +97,11 @@ public sealed record BookDetailsDto(
             book.ClassificationNumber,
             book.Format.ToString(),
             book.MetadataSource.ToString(),
+            book.IsReferenceOnly,
             book.CreatedAtUtc,
             CopiesTotal: copies.Count,
-            CopiesAvailable: book.Copies.Count(c => c.Status == CopyStatus.Available),
+            CopiesAvailable: available,
+            IsLowStock: lowStockThreshold is { } threshold && copies.Count > 0 && available <= threshold,
             Copies: copies,
             BorrowHistory: borrowHistory ?? [],
             Holds: holds ?? []);

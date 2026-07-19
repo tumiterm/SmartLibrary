@@ -4,12 +4,15 @@ import {
   ArrowDownToLine,
   ArrowLeftRight,
   ArrowUpFromLine,
+  Building2,
   IdCard,
   PackageCheck,
+  PackageX,
   RotateCw,
   ScanBarcode,
+  SearchX,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -26,14 +29,22 @@ import {
   getPendingTransfers,
   receiveTransfer,
   renewLoan,
+  reportLost,
   returnBook,
+  transferAction,
 } from '@/lib/api'
+import { COPY_CONDITIONS, type CopyCondition } from '@/lib/catalog'
+import type { ReturnOutcome, TransferStatus } from '@/lib/circulation'
+
+const DESK_BRANCH_KEY = 'smartlibrary-desk-branch'
 
 function formatDue(value: string) {
   return new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
 }
 
-function CheckoutPanel({ onDone }: { onDone: () => void }) {
+/* ── Checkout ─────────────────────────────────────────────────────────────── */
+
+function CheckoutPanel({ deskBranchId, onDone }: { deskBranchId: string; onDone: () => void }) {
   const [card, setCard] = useState('')
   const [barcode, setBarcode] = useState('')
   const [scanned, setScanned] = useState<string[]>([])
@@ -50,7 +61,7 @@ function CheckoutPanel({ onDone }: { onDone: () => void }) {
   const mutation = useMutation({
     mutationFn: () => {
       const pending = barcode.trim() && !scanned.includes(barcode.trim()) ? [...scanned, barcode.trim()] : scanned
-      return checkoutBooks(card.trim(), pending)
+      return checkoutBooks(card.trim(), pending, deskBranchId || null)
     },
     onSuccess: (result) => {
       if (result.loans.length > 0) {
@@ -114,7 +125,6 @@ function CheckoutPanel({ onDone }: { onDone: () => void }) {
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 onKeyDown={(e) => {
-                  // Barcode scanners terminate with Enter — collect, don't submit.
                   if (e.key === 'Enter') {
                     e.preventDefault()
                     addBarcode()
@@ -148,13 +158,36 @@ function CheckoutPanel({ onDone }: { onDone: () => void }) {
   )
 }
 
-function ReturnPanel({ onDone }: { onDone: () => void }) {
+/* ── Return (condition-aware) ─────────────────────────────────────────────── */
+
+function ReturnPanel({ deskBranchId, onDone }: { deskBranchId: string; onDone: () => void }) {
   const [barcode, setBarcode] = useState('')
+  const [outcome, setOutcome] = useState<ReturnOutcome>('Normal')
+  const [condition, setCondition] = useState<CopyCondition | ''>('')
+  const [damageCharge, setDamageCharge] = useState('')
+
+  const reset = () => {
+    setBarcode('')
+    setOutcome('Normal')
+    setCondition('')
+    setDamageCharge('')
+  }
 
   const mutation = useMutation({
-    mutationFn: () => returnBook(barcode.trim()),
+    mutationFn: () =>
+      returnBook({
+        barcode: barcode.trim(),
+        outcome,
+        condition: condition || null,
+        damageCharge: outcome === 'Damaged' && damageCharge ? Number(damageCharge) : null,
+        branchId: deskBranchId || null,
+      }),
     onSuccess: (result) => {
-      if (result.wasLate) {
+      if (result.outcome === 'Damaged') {
+        toast.warning(`Returned damaged — pulled from circulation`, {
+          description: `${result.loan.bookTitle}${result.finesAssessed.length > 0 ? ` — charges: ${result.finesAssessed.map((f) => f.amount.toFixed(2)).join(' + ')}` : ''}`,
+        })
+      } else if (result.wasLate) {
         toast.warning(`Returned ${result.daysLate} day${result.daysLate === 1 ? '' : 's'} late`, {
           description: `${result.loan.bookTitle} — fine of ${result.fineAssessed?.amount.toFixed(2)} assessed to ${result.loan.memberName}`,
         })
@@ -169,10 +202,31 @@ function ReturnPanel({ onDone }: { onDone: () => void }) {
           duration: 10000,
         })
       }
-      setBarcode('')
+      if (result.returnedAtDifferentBranch && result.homeBranchName) {
+        toast.info('Wrong branch', {
+          description: `This copy lives at ${result.homeBranchName} — send it back via transfer.`,
+          duration: 10000,
+        })
+      }
+      reset()
       onDone()
     },
     onError: (error: Error) => toast.error('Return failed', { description: error.message }),
+  })
+
+  const lostMutation = useMutation({
+    mutationFn: () => reportLost(barcode.trim()),
+    onSuccess: (result) => {
+      toast.warning(`${result.loan.bookTitle} written off as lost`, {
+        description: result.replacementCharge
+          ? `Replacement charge of ${result.replacementCharge.amount.toFixed(2)} assessed to ${result.loan.memberName}`
+          : `No price on file — add a manual charge if needed.`,
+        duration: 10000,
+      })
+      reset()
+      onDone()
+    },
+    onError: (error: Error) => toast.error('Could not report lost', { description: error.message }),
   })
 
   return (
@@ -182,7 +236,7 @@ function ReturnPanel({ onDone }: { onDone: () => void }) {
           <ArrowDownToLine className="size-4 text-accent" />
           Return
         </CardTitle>
-        <CardDescription>One scan — we find the loan and assess any fine.</CardDescription>
+        <CardDescription>Scan, judge the condition, done.</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -205,15 +259,75 @@ function ReturnPanel({ onDone }: { onDone: () => void }) {
               />
             </div>
           </div>
-          <Button type="submit" variant="secondary" disabled={mutation.isPending || !barcode.trim()}>
-            {mutation.isPending ? <Spinner /> : <ArrowDownToLine className="size-4" />}
-            Return
-          </Button>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="ret-outcome">Came back</Label>
+              <Select
+                id="ret-outcome"
+                value={outcome}
+                onChange={(e) => setOutcome(e.target.value as ReturnOutcome)}
+              >
+                <option value="Normal">In good order</option>
+                <option value="Damaged">Damaged</option>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="ret-condition">Condition</Label>
+              <Select
+                id="ret-condition"
+                value={condition}
+                onChange={(e) => setCondition(e.target.value as CopyCondition | '')}
+              >
+                <option value="">Unchanged</option>
+                {COPY_CONDITIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+          {outcome === 'Damaged' && (
+            <div>
+              <Label htmlFor="ret-charge">Damage charge (optional)</Label>
+              <Input
+                id="ret-charge"
+                type="number"
+                min={0}
+                step="0.50"
+                placeholder="0.00"
+                value={damageCharge}
+                onChange={(e) => setDamageCharge(e.target.value)}
+              />
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Button
+              type="submit"
+              variant="secondary"
+              className="flex-1"
+              disabled={mutation.isPending || !barcode.trim()}
+            >
+              {mutation.isPending ? <Spinner /> : <ArrowDownToLine className="size-4" />}
+              Return
+            </Button>
+            <Button
+              variant="ghost"
+              title="The member cannot return it — write the copy off and raise a replacement charge"
+              disabled={lostMutation.isPending || !barcode.trim()}
+              onClick={() => lostMutation.mutate()}
+            >
+              {lostMutation.isPending ? <Spinner /> : <SearchX className="size-4" />}
+              Lost
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>
   )
 }
+
+/* ── Renew ────────────────────────────────────────────────────────────────── */
 
 function RenewPanel({ onDone }: { onDone: () => void }) {
   const [barcode, setBarcode] = useState('')
@@ -270,6 +384,8 @@ function RenewPanel({ onDone }: { onDone: () => void }) {
   )
 }
 
+/* ── Transfer request ─────────────────────────────────────────────────────── */
+
 function TransferPanel({ onDone }: { onDone: () => void }) {
   const [barcode, setBarcode] = useState('')
   const [toBranchId, setToBranchId] = useState('')
@@ -278,8 +394,8 @@ function TransferPanel({ onDone }: { onDone: () => void }) {
   const mutation = useMutation({
     mutationFn: () => createTransfer(barcode.trim(), toBranchId),
     onSuccess: (transfer) => {
-      toast.success('Transfer started', {
-        description: `${transfer.bookTitle} → ${transfer.toBranchName} (in transit)`,
+      toast.success('Transfer requested', {
+        description: `${transfer.bookTitle} → ${transfer.toBranchName}. Dispatch it when it leaves.`,
       })
       setBarcode('')
       setToBranchId('')
@@ -295,7 +411,7 @@ function TransferPanel({ onDone }: { onDone: () => void }) {
           <ArrowLeftRight className="size-4 text-accent" />
           Transfer
         </CardTitle>
-        <CardDescription>Send an available copy to another branch.</CardDescription>
+        <CardDescription>Request → dispatch → receive, with full history.</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -331,7 +447,7 @@ function TransferPanel({ onDone }: { onDone: () => void }) {
           </div>
           <Button type="submit" variant="secondary" disabled={mutation.isPending || !barcode.trim() || !toBranchId}>
             {mutation.isPending ? <Spinner /> : <ArrowLeftRight className="size-4" />}
-            Send
+            Request
           </Button>
         </form>
       </CardContent>
@@ -339,13 +455,37 @@ function TransferPanel({ onDone }: { onDone: () => void }) {
   )
 }
 
+/* ── Page ─────────────────────────────────────────────────────────────────── */
+
+const TRANSFER_BADGE: Record<TransferStatus, 'brass' | 'neutral' | 'success' | 'danger'> = {
+  Requested: 'neutral',
+  InTransit: 'brass',
+  Received: 'success',
+  Rejected: 'danger',
+  Cancelled: 'neutral',
+  LostInTransit: 'danger',
+  DamagedInTransit: 'danger',
+}
+
 export function CirculationPage() {
   const queryClient = useQueryClient()
   const [overdueOnly, setOverdueOnly] = useState(false)
+  const [deskBranchId, setDeskBranchId] = useState(() => localStorage.getItem(DESK_BRANCH_KEY) ?? '')
+  const branches = useQuery({ queryKey: ['branches'], queryFn: getBranches })
   const loans = useQuery({ queryKey: ['active-loans'], queryFn: getActiveLoans })
+  const transfers = useQuery({ queryKey: ['pending-transfers'], queryFn: getPendingTransfers })
+
+  useEffect(() => {
+    localStorage.setItem(DESK_BRANCH_KEY, deskBranchId)
+  }, [deskBranchId])
+
   const visibleLoans = (loans.data ?? []).filter((l) => !overdueOnly || l.isOverdue)
   const overdueCount = (loans.data ?? []).filter((l) => l.isOverdue).length
-  const transfers = useQuery({ queryKey: ['pending-transfers'], queryFn: getPendingTransfers })
+
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ['active-loans'] })
+    void queryClient.invalidateQueries({ queryKey: ['pending-transfers'] })
+  }
 
   const receive = useMutation({
     mutationFn: (barcode: string) => receiveTransfer(barcode),
@@ -353,29 +493,51 @@ export function CirculationPage() {
       toast.success('Transfer received', {
         description: `${transfer.bookTitle} is now at ${transfer.toBranchName}.`,
       })
-      void queryClient.invalidateQueries({ queryKey: ['pending-transfers'] })
+      refresh()
     },
     onError: (error: Error) => toast.error('Could not receive transfer', { description: error.message }),
   })
 
-  const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ['active-loans'] })
-    void queryClient.invalidateQueries({ queryKey: ['pending-transfers'] })
-  }
+  const act = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: Parameters<typeof transferAction>[1] }) =>
+      transferAction(id, action),
+    onSuccess: (transfer) => {
+      toast.success(`Transfer ${transfer.status}`, { description: transfer.bookTitle })
+      refresh()
+    },
+    onError: (error: Error) => toast.error('Transfer action failed', { description: error.message }),
+  })
 
   return (
     <div className="flex flex-col gap-8">
-      <header className="animate-fade">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Circulation</p>
-        <h1 className="font-display mt-2 text-3xl font-semibold sm:text-4xl">The desk</h1>
-        <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-          Check books out and in. Everything is scan-first — card, then barcode.
-        </p>
+      <header className="flex animate-fade flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Circulation</p>
+          <h1 className="font-display mt-2 text-3xl font-semibold sm:text-4xl">The desk</h1>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
+            Check books out and in. Everything is scan-first — card, then barcode.
+          </p>
+        </div>
+        <div className="w-56">
+          <Label htmlFor="desk-branch">
+            <span className="inline-flex items-center gap-1.5">
+              <Building2 className="size-3.5" /> This desk's branch
+            </span>
+          </Label>
+          <Select id="desk-branch" value={deskBranchId} onChange={(e) => setDeskBranchId(e.target.value)}>
+            <option value="">Any branch (HQ mode)</option>
+            {branches.data?.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </Select>
+        </div>
       </header>
 
       <div className="grid animate-rise gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <CheckoutPanel onDone={refresh} />
-        <ReturnPanel onDone={refresh} />
+        <CheckoutPanel deskBranchId={deskBranchId} onDone={refresh} />
+        <ReturnPanel deskBranchId={deskBranchId} onDone={refresh} />
         <RenewPanel onDone={refresh} />
         <TransferPanel onDone={refresh} />
       </div>
@@ -385,10 +547,10 @@ export function CirculationPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PackageCheck className="size-4 text-accent" />
-              In transit
+              Open transfers
               <Badge variant="brass">{transfers.data.length}</Badge>
             </CardTitle>
-            <CardDescription>Scan these in at the receiving branch.</CardDescription>
+            <CardDescription>Dispatch at the source; scan in at the destination.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto rounded-xl border border-border">
@@ -398,6 +560,7 @@ export function CirculationPage() {
                     <th className="px-4 py-2.5 font-medium">Book</th>
                     <th className="px-4 py-2.5 font-medium">Barcode</th>
                     <th className="px-4 py-2.5 font-medium">Route</th>
+                    <th className="px-4 py-2.5 font-medium">Status</th>
                     <th className="px-4 py-2.5 font-medium"></th>
                   </tr>
                 </thead>
@@ -409,16 +572,54 @@ export function CirculationPage() {
                       <td className="px-4 py-2.5 text-muted">
                         {t.fromBranchName ?? 'Unassigned'} → <span className="text-ink">{t.toBranchName}</span>
                       </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={receive.isPending}
-                          onClick={() => receive.mutate(t.barcode)}
-                        >
-                          <PackageCheck className="size-4" />
-                          Receive
-                        </Button>
+                      <td className="px-4 py-2.5">
+                        <Badge variant={TRANSFER_BADGE[t.status]}>{t.status}</Badge>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex justify-end gap-1.5">
+                          {t.status === 'Requested' && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={act.isPending}
+                                onClick={() => act.mutate({ id: t.id, action: 'Dispatch' })}
+                              >
+                                Dispatch
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={act.isPending}
+                                onClick={() => act.mutate({ id: t.id, action: 'Cancel' })}
+                              >
+                                Cancel
+                              </Button>
+                            </>
+                          )}
+                          {t.status === 'InTransit' && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={receive.isPending}
+                                onClick={() => receive.mutate(t.barcode)}
+                              >
+                                <PackageCheck className="size-4" />
+                                Receive
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Never arrived — write off as lost"
+                                disabled={act.isPending}
+                                onClick={() => act.mutate({ id: t.id, action: 'LostInTransit' })}
+                              >
+                                <PackageX className="size-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

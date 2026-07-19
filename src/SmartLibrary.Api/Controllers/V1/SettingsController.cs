@@ -30,7 +30,9 @@ public sealed class SettingsController(ISender sender) : ControllerBase
                 request.MaxActiveLoans,
                 request.FineBlockThreshold,
                 request.MaxRenewals,
-                request.HoldPickupDays),
+                request.HoldPickupDays,
+                request.LowStockThreshold,
+                request.MaxOverdueItems),
             cancellationToken));
 }
 
@@ -40,4 +42,6 @@ public sealed record UpdateLibrarySettingsRequest(
     int MaxActiveLoans,
     decimal FineBlockThreshold,
     int MaxRenewals,
-    int HoldPickupDays);
+    int HoldPickupDays,
+    int LowStockThreshold = 2,
+    int MaxOverdueItems = 1);

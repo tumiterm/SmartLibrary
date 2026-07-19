@@ -9,8 +9,22 @@ import type {
   Branch,
   PagedResult,
 } from './catalog'
-import type { CheckoutResult, Fine, Hold, Loan, MemberProfile, ReturnResult, Transfer } from './circulation'
-import type { CopyStatus } from './catalog'
+import type {
+  CheckoutResult,
+  Fine,
+  Hold,
+  Loan,
+  LostBookResult,
+  MemberProfile,
+  ReturnOutcome,
+  ReturnResult,
+  ScanResult,
+  Stocktake,
+  StocktakeReport,
+  Transfer,
+  TransferAction,
+} from './circulation'
+import type { CopyCondition, CopyStatus } from './catalog'
 import type { Member, MemberStatus, RegisterMemberRequest } from './members'
 import type { Dashboard, GlobalSearchResult, LibrarySettings } from './system'
 
@@ -133,17 +147,75 @@ export function getActiveLoans(): Promise<Loan[]> {
   return request<Loan[]>('/loans/active')
 }
 
-export function checkoutBooks(membershipNumber: string, barcodes: string[]): Promise<CheckoutResult> {
+export function checkoutBooks(
+  membershipNumber: string,
+  barcodes: string[],
+  branchId?: string | null,
+): Promise<CheckoutResult> {
   return request<CheckoutResult>('/loans', {
     method: 'POST',
-    body: JSON.stringify({ membershipNumber, barcodes }),
+    body: JSON.stringify({ membershipNumber, barcodes, branchId: branchId || null }),
   })
 }
 
-export function returnBook(barcode: string): Promise<ReturnResult> {
+export function returnBook(params: {
+  barcode: string
+  outcome?: ReturnOutcome
+  condition?: CopyCondition | null
+  damageCharge?: number | null
+  branchId?: string | null
+}): Promise<ReturnResult> {
   return request<ReturnResult>('/loans/return', {
     method: 'POST',
+    body: JSON.stringify({
+      barcode: params.barcode,
+      outcome: params.outcome ?? 'Normal',
+      condition: params.condition ?? null,
+      damageCharge: params.damageCharge ?? null,
+      branchId: params.branchId || null,
+    }),
+  })
+}
+
+export function reportLost(barcode: string, replacementCharge?: number | null): Promise<LostBookResult> {
+  return request<LostBookResult>('/loans/lost', {
+    method: 'POST',
+    body: JSON.stringify({ barcode, replacementCharge: replacementCharge ?? null }),
+  })
+}
+
+export function transferAction(id: string, action: TransferAction, note?: string): Promise<Transfer> {
+  return request<Transfer>(`/transfers/${id}/action`, {
+    method: 'POST',
+    body: JSON.stringify({ action, note: note ?? null }),
+  })
+}
+
+export function getOpenStocktake(): Promise<Stocktake | null> {
+  return request<Stocktake | null>('/stocktakes/open')
+}
+
+export function getStocktakes(): Promise<Stocktake[]> {
+  return request<Stocktake[]>('/stocktakes')
+}
+
+export function startStocktake(branchId?: string | null): Promise<Stocktake> {
+  return request<Stocktake>('/stocktakes', {
+    method: 'POST',
+    body: JSON.stringify({ branchId: branchId || null, notes: null }),
+  })
+}
+
+export function scanStocktakeItem(stocktakeId: string, barcode: string): Promise<ScanResult> {
+  return request<ScanResult>(`/stocktakes/${stocktakeId}/scans`, {
+    method: 'POST',
     body: JSON.stringify({ barcode }),
+  })
+}
+
+export function completeStocktake(stocktakeId: string): Promise<StocktakeReport> {
+  return request<StocktakeReport>(`/stocktakes/${stocktakeId}/complete`, {
+    method: 'POST',
   })
 }
 

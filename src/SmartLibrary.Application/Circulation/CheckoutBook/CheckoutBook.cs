@@ -16,7 +16,8 @@ namespace SmartLibrary.Application.Circulation.CheckoutBook;
 /// </summary>
 public sealed record CheckoutBooksCommand(
     string MembershipNumber,
-    IReadOnlyList<string> Barcodes) : IRequest<CheckoutResultDto>;
+    IReadOnlyList<string> Barcodes,
+    Guid? BranchId = null) : IRequest<CheckoutResultDto>;
 
 public sealed record CheckoutFailureDto(string Barcode, string Error);
 
@@ -71,6 +72,13 @@ public sealed class CheckoutBooksCommandHandler(
                 $"{member.FullName} owes {owed:0.00} in fines (limit {policy.FineBlockThreshold:0.00}). Settle first.");
         }
 
+        var overdue = await loans.CountOverdueByMemberAsync(member.Id, now, cancellationToken);
+        if (policy.MaxOverdueItems > 0 && overdue >= policy.MaxOverdueItems)
+        {
+            throw new ConflictException(
+                $"{member.FullName} has {overdue} overdue item{(overdue == 1 ? "" : "s")} — bring those back first.");
+        }
+
         var activeLoans = await loans.CountActiveByMemberAsync(member.Id, cancellationToken);
 
         var successes = new List<LoanDto>();
@@ -86,7 +94,7 @@ public sealed class CheckoutBooksCommandHandler(
                         $"{member.FullName} is at the loan limit of {policy.MaxActiveLoans}.");
                 }
 
-                var loan = await CheckoutOneAsync(member, rawBarcode, policy, now, cancellationToken);
+                var loan = await CheckoutOneAsync(member, rawBarcode, policy, now, request.BranchId, cancellationToken);
                 successes.Add(LoanDto.FromEntity(loan));
             }
             catch (Exception ex) when (ex is ConflictException or NotFoundException)
@@ -108,10 +116,30 @@ public sealed class CheckoutBooksCommandHandler(
         string barcode,
         CirculationOptions policy,
         DateTime now,
+        Guid? deskBranchId,
         CancellationToken cancellationToken)
     {
         var copy = await books.GetCopyByBarcodeAsync(barcode, cancellationToken)
             ?? throw new NotFoundException($"No copy has barcode {barcode}.");
+
+        if (copy.Book?.IsReferenceOnly == true)
+        {
+            throw new ConflictException($"{copy.Book.Title} is reference-only and cannot leave the library.");
+        }
+
+        // One title per member — a second copy of the same book (any branch) is refused.
+        if (await loans.HasActiveLoanForBookAsync(member.Id, copy.BookId, cancellationToken))
+        {
+            throw new ConflictException(
+                $"{member.FullName} already has a copy of {copy.Book?.Title ?? "this title"} out.");
+        }
+
+        // A physical copy can only be issued by the branch that holds it.
+        if (deskBranchId is { } desk && copy.BranchId is { } home && desk != home)
+        {
+            throw new ConflictException(
+                $"Copy {copy.Barcode} belongs to {copy.Branch?.Name ?? "another branch"} — transfer it first.");
+        }
 
         await holdExpiry.ExpireStaleAsync(copy.BookId, cancellationToken);
 

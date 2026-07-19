@@ -22,6 +22,16 @@ public sealed class LoanRepository(AppDbContext dbContext) : ILoanRepository
             l => l.MemberId == memberId && l.ReturnedAtUtc == null,
             cancellationToken);
 
+    public Task<bool> HasActiveLoanForBookAsync(Guid memberId, Guid bookId, CancellationToken cancellationToken) =>
+        dbContext.Loans.AnyAsync(
+            l => l.MemberId == memberId && l.ReturnedAtUtc == null && l.BookCopy!.BookId == bookId,
+            cancellationToken);
+
+    public Task<int> CountOverdueByMemberAsync(Guid memberId, DateTime nowUtc, CancellationToken cancellationToken) =>
+        dbContext.Loans.CountAsync(
+            l => l.MemberId == memberId && l.ReturnedAtUtc == null && l.DueAtUtc < nowUtc,
+            cancellationToken);
+
     public async Task<IReadOnlyList<Loan>> GetByMemberAsync(Guid memberId, CancellationToken cancellationToken) =>
         await WithGraph()
             .Where(l => l.MemberId == memberId)

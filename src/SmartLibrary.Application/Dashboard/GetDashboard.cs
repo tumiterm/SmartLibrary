@@ -11,6 +11,8 @@ public sealed record ActivityItemDto(
     Guid MemberId,
     DateTime AtUtc);
 
+public sealed record LowStockItemDto(Guid BookId, string Title, int Available, int Total);
+
 public sealed record DashboardDto(
     int TotalBooks,
     int TotalCopies,
@@ -21,7 +23,8 @@ public sealed record DashboardDto(
     int PendingTransfers,
     int ReadyHolds,
     decimal OutstandingFines,
-    IReadOnlyList<ActivityItemDto> RecentActivity);
+    IReadOnlyList<ActivityItemDto> RecentActivity,
+    IReadOnlyList<LowStockItemDto> LowStock);
 
 public sealed record GetDashboardQuery : IRequest<DashboardDto>;
 

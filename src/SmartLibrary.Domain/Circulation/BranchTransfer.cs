@@ -23,8 +23,14 @@ public class BranchTransfer : IAuditable
 
     public Branch? ToBranch { get; set; }
 
+    public TransferStatus Status { get; set; } = TransferStatus.Requested;
+
     public DateTime RequestedAtUtc { get; set; } = DateTime.UtcNow;
 
+    /// <summary>When the source branch released the copy.</summary>
+    public DateTime? DispatchedAtUtc { get; set; }
+
+    /// <summary>Terminal timestamp: received, rejected, cancelled, or written off.</summary>
     public DateTime? CompletedAtUtc { get; set; }
 
     public string? Notes { get; set; }
@@ -37,5 +43,5 @@ public class BranchTransfer : IAuditable
 
     public string? UpdatedBy { get; set; }
 
-    public bool IsPending => CompletedAtUtc is null;
+    public bool IsPending => Status is TransferStatus.Requested or TransferStatus.InTransit;
 }

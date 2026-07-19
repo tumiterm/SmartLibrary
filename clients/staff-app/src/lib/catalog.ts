@@ -22,6 +22,8 @@ export type CopyStatus =
   | 'Lost'
   | 'Damaged'
   | 'Withdrawn'
+  | 'Missing'
+  | 'Disposed'
 
 export type CopyCondition = 'New' | 'Good' | 'Fair' | 'Poor'
 
@@ -119,9 +121,11 @@ export interface BookDetails {
   classificationNumber: string | null
   format: BookFormat
   metadataSource: string
+  isReferenceOnly: boolean
   createdAtUtc: string
   copiesTotal: number
   copiesAvailable: number
+  isLowStock: boolean
   copies: BookCopy[]
   borrowHistory: LoanSummary[]
   holds: HoldQueueItem[]
@@ -147,6 +151,7 @@ export interface BookFields {
   coverImageUrl: string | null
   classificationNumber: string | null
   format: BookFormat
+  isReferenceOnly: boolean
 }
 
 export interface AddBookRequest extends BookFields {

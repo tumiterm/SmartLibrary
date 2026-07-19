@@ -7,14 +7,35 @@ using SmartLibrary.Domain.Circulation;
 
 namespace SmartLibrary.Application.Circulation.ReturnBook;
 
-/// <summary>One scan returns the book: the active loan is found from the barcode.</summary>
-public sealed record ReturnBookCommand(string Barcode) : IRequest<ReturnResultDto>;
+public enum ReturnOutcome
+{
+    /// <summary>Book came back in acceptable shape — normal shelving/hold flow.</summary>
+    Normal = 0,
+
+    /// <summary>Book came back damaged — pulled from circulation, optional damage charge.</summary>
+    Damaged = 1,
+}
+
+/// <summary>
+/// A return is only valid against an active loan. It records when and where the book
+/// came back, judges its condition, assesses fines, closes the loan — and never
+/// deletes the borrowing record.
+/// </summary>
+public sealed record ReturnBookCommand(
+    string Barcode,
+    ReturnOutcome Outcome = ReturnOutcome.Normal,
+    CopyCondition? Condition = null,
+    decimal? DamageCharge = null,
+    Guid? BranchId = null) : IRequest<ReturnResultDto>;
 
 public sealed class ReturnBookCommandValidator : AbstractValidator<ReturnBookCommand>
 {
     public ReturnBookCommandValidator()
     {
         RuleFor(c => c.Barcode).NotEmpty().MaximumLength(100);
+        RuleFor(c => c.Outcome).IsInEnum();
+        RuleFor(c => c.Condition).IsInEnum().When(c => c.Condition.HasValue);
+        RuleFor(c => c.DamageCharge).GreaterThan(0).When(c => c.DamageCharge.HasValue);
     }
 }
 
@@ -36,47 +57,81 @@ public sealed class ReturnBookCommandHandler(
         var daysLate = Math.Max(0, (now.Date - loan.DueAtUtc.Date).Days);
         var copy = loan.BookCopy!;
 
+        // Close the loan — the transaction itself is permanent history.
         loan.ReturnedAtUtc = now;
         loan.DaysLate = daysLate;
+        loan.ReturnBranchId = request.BranchId;
 
-        Fine? fine = null;
+        var assessed = new List<Fine>();
         if (daysLate > 0)
         {
-            fine = new Fine
-            {
-                MemberId = loan.MemberId,
-                Member = loan.Member,
-                LoanId = loan.Id,
-                Loan = loan,
-                Amount = daysLate * policy.DailyFineAmount,
-                Reason = FineReason.Overdue,
-            };
-            fines.Add(fine);
+            assessed.Add(NewFine(loan, daysLate * policy.DailyFineAmount, FineReason.Overdue, null));
         }
 
-        // The waitlist claims the copy before it goes back on the shelf.
-        string? holdReadyFor = null;
-        var nextHold = await holds.GetOldestPendingByBookAsync(copy.BookId, cancellationToken);
-        if (nextHold is not null)
+        if (request.Condition is { } condition)
         {
-            nextHold.Status = HoldStatus.Ready;
-            nextHold.BookCopyId = copy.Id;
-            nextHold.ReadyAtUtc = now;
-            copy.Status = CopyStatus.OnHold;
-            holdReadyFor = nextHold.Member?.FullName;
+            copy.Condition = condition;
+        }
+
+        string? holdReadyFor = null;
+        if (request.Outcome == ReturnOutcome.Damaged)
+        {
+            // Damaged stock never goes back to the shelf or the hold queue.
+            copy.Status = CopyStatus.Damaged;
+            if (request.DamageCharge is { } charge)
+            {
+                assessed.Add(NewFine(loan, charge, FineReason.Damage, "Assessed at return"));
+            }
         }
         else
         {
-            copy.Status = CopyStatus.Available;
+            // The waitlist claims the copy before it goes back on the shelf.
+            var nextHold = await holds.GetOldestPendingByBookAsync(copy.BookId, cancellationToken);
+            if (nextHold is not null)
+            {
+                nextHold.Status = HoldStatus.Ready;
+                nextHold.BookCopyId = copy.Id;
+                nextHold.ReadyAtUtc = now;
+                copy.Status = CopyStatus.OnHold;
+                holdReadyFor = nextHold.Member?.FullName;
+            }
+            else
+            {
+                copy.Status = CopyStatus.Available;
+            }
+        }
+
+        foreach (var fine in assessed)
+        {
+            fines.Add(fine);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var returnedElsewhere = request.BranchId is { } branch
+            && copy.BranchId is { } home
+            && branch != home;
 
         return new ReturnResultDto(
             LoanDto.FromEntity(loan),
             WasLate: daysLate > 0,
             DaysLate: daysLate,
-            FineAssessed: fine is null ? null : FineDto.FromEntity(fine),
-            HoldReadyFor: holdReadyFor);
+            FineAssessed: assessed.Count > 0 ? FineDto.FromEntity(assessed[0]) : null,
+            HoldReadyFor: holdReadyFor,
+            Outcome: request.Outcome.ToString(),
+            FinesAssessed: [.. assessed.Select(FineDto.FromEntity)],
+            ReturnedAtDifferentBranch: returnedElsewhere,
+            HomeBranchName: returnedElsewhere ? copy.Branch?.Name : null);
     }
+
+    private static Fine NewFine(Loan loan, decimal amount, FineReason reason, string? notes) => new()
+    {
+        MemberId = loan.MemberId,
+        Member = loan.Member,
+        LoanId = loan.Id,
+        Loan = loan,
+        Amount = amount,
+        Reason = reason,
+        Notes = notes,
+    };
 }

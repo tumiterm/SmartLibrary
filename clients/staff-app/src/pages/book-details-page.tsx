@@ -27,8 +27,11 @@ import {
   type CopyStatus,
 } from '@/lib/catalog'
 
-/** Statuses staff can set by hand; circulation owns the rest. */
-const MANUAL_STATUSES: CopyStatus[] = ['Available', 'Lost', 'Damaged', 'Withdrawn']
+/** Target statuses staff can set by hand; circulation owns the rest. */
+const MANUAL_TARGETS: CopyStatus[] = ['Available', 'Lost', 'Damaged', 'Withdrawn', 'Disposed']
+
+/** States the control appears for — Missing (set by stocktake) is restorable too. */
+const CHANGEABLE_FROM: CopyStatus[] = [...MANUAL_TARGETS, 'Missing']
 
 const STATUS_VARIANT: Record<CopyStatus, 'success' | 'brass' | 'neutral' | 'danger'> = {
   Available: 'success',
@@ -38,6 +41,8 @@ const STATUS_VARIANT: Record<CopyStatus, 'success' | 'brass' | 'neutral' | 'dang
   Lost: 'danger',
   Damaged: 'danger',
   Withdrawn: 'neutral',
+  Missing: 'danger',
+  Disposed: 'neutral',
 }
 
 function formatLabel(value: string) {
@@ -384,6 +389,8 @@ export function BookDetailsPage() {
             {b.pageCount && <Badge>{b.pageCount} pages</Badge>}
             {b.language && <Badge>{b.language.toUpperCase()}</Badge>}
             <Badge variant="brass">{b.metadataSource === 'GoogleBooks' ? 'Google Books' : 'Manual'}</Badge>
+            {b.isReferenceOnly && <Badge variant="danger">Reference only</Badge>}
+            {b.isLowStock && <Badge variant="danger">Low stock</Badge>}
           </div>
 
           {b.description && (
@@ -437,7 +444,7 @@ export function BookDetailsPage() {
                         {copy.price != null ? copy.price.toFixed(2) : <span className="text-faint">—</span>}
                       </td>
                       <td className="px-4 py-2.5">
-                        {MANUAL_STATUSES.includes(copy.status) ? (
+                        {CHANGEABLE_FROM.includes(copy.status) ? (
                           <Select
                             aria-label={`Status of copy ${copy.barcode}`}
                             className="h-8 w-32 text-[13px]"
@@ -447,7 +454,7 @@ export function BookDetailsPage() {
                               statusMutation.mutate({ copyId: copy.id, status: e.target.value as CopyStatus })
                             }
                           >
-                            {MANUAL_STATUSES.map((s) => (
+                            {[...new Set([copy.status, ...MANUAL_TARGETS])].map((s) => (
                               <option key={s} value={s}>
                                 {s}
                               </option>

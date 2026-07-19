@@ -23,7 +23,8 @@ public sealed record UpdateBookCommand(
     IReadOnlyList<string> Categories,
     string? CoverImageUrl,
     string? ClassificationNumber,
-    BookFormat Format) : IRequest;
+    BookFormat Format,
+    bool IsReferenceOnly = false) : IRequest;
 
 public sealed class UpdateBookCommandValidator : AbstractValidator<UpdateBookCommand>
 {
@@ -56,6 +57,7 @@ public sealed class UpdateBookCommandHandler(IBookRepository books, IUnitOfWork 
         book.CoverImageUrl = request.CoverImageUrl;
         book.ClassificationNumber = request.ClassificationNumber?.Trim();
         book.Format = request.Format;
+        book.IsReferenceOnly = request.IsReferenceOnly;
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }

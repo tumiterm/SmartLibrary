@@ -43,6 +43,9 @@ public class Book : IAuditable
 
     public BookFormat Format { get; set; } = BookFormat.Print;
 
+    /// <summary>Reference-only material never leaves the library — checkout is refused.</summary>
+    public bool IsReferenceOnly { get; set; }
+
     public MetadataSource MetadataSource { get; set; } = MetadataSource.Manual;
 
     public DateTime CreatedAtUtc { get; set; }

@@ -12,9 +12,11 @@ public sealed record LibrarySettingsDto(
     decimal FineBlockThreshold,
     int MaxRenewals,
     int HoldPickupDays,
+    int LowStockThreshold,
+    int MaxOverdueItems,
     bool IsCustomized);
 
-/* ── Read ─────────────────────────────────────────────────────────────────── */
+/* ---- Read ---------------------------------------------------------------- */
 
 public sealed record GetLibrarySettingsQuery : IRequest<LibrarySettingsDto>;
 
@@ -37,11 +39,13 @@ public sealed class GetLibrarySettingsQueryHandler(
             effective.FineBlockThreshold,
             effective.MaxRenewals,
             effective.HoldPickupDays,
+            effective.LowStockThreshold,
+            effective.MaxOverdueItems,
             IsCustomized: custom is not null);
     }
 }
 
-/* ── Update ───────────────────────────────────────────────────────────────── */
+/* ---- Update -------------------------------------------------------------- */
 
 public sealed record UpdateLibrarySettingsCommand(
     int LoanDays,
@@ -49,7 +53,9 @@ public sealed record UpdateLibrarySettingsCommand(
     int MaxActiveLoans,
     decimal FineBlockThreshold,
     int MaxRenewals,
-    int HoldPickupDays) : IRequest<LibrarySettingsDto>;
+    int HoldPickupDays,
+    int LowStockThreshold,
+    int MaxOverdueItems) : IRequest<LibrarySettingsDto>;
 
 public sealed class UpdateLibrarySettingsCommandValidator : AbstractValidator<UpdateLibrarySettingsCommand>
 {
@@ -61,6 +67,8 @@ public sealed class UpdateLibrarySettingsCommandValidator : AbstractValidator<Up
         RuleFor(c => c.FineBlockThreshold).InclusiveBetween(0, 1_000_000);
         RuleFor(c => c.MaxRenewals).InclusiveBetween(0, 20);
         RuleFor(c => c.HoldPickupDays).InclusiveBetween(1, 60);
+        RuleFor(c => c.LowStockThreshold).InclusiveBetween(0, 100);
+        RuleFor(c => c.MaxOverdueItems).InclusiveBetween(1, 100);
     }
 }
 
@@ -86,6 +94,8 @@ public sealed class UpdateLibrarySettingsCommandHandler(
         row.FineBlockThreshold = request.FineBlockThreshold;
         row.MaxRenewals = request.MaxRenewals;
         row.HoldPickupDays = request.HoldPickupDays;
+        row.LowStockThreshold = request.LowStockThreshold;
+        row.MaxOverdueItems = request.MaxOverdueItems;
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -96,6 +106,8 @@ public sealed class UpdateLibrarySettingsCommandHandler(
             row.FineBlockThreshold,
             row.MaxRenewals,
             row.HoldPickupDays,
+            row.LowStockThreshold,
+            row.MaxOverdueItems,
             IsCustomized: true);
     }
 }

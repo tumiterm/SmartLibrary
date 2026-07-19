@@ -58,11 +58,19 @@ public sealed record FineDto(
         fine.Notes);
 }
 
-/// <summary>Outcome of a return scan — includes the fine when the return was late.</summary>
+/// <summary>Outcome of a return scan — includes any fines assessed at the desk.</summary>
 /// <param name="HoldReadyFor">Set when the copy was claimed by the waitlist — the desk sets it aside for this member.</param>
+/// <param name="ReturnedAtDifferentBranch">True when the receiving desk isn't the copy's home branch — send it back via transfer.</param>
 public sealed record ReturnResultDto(
     LoanDto Loan,
     bool WasLate,
     int DaysLate,
     FineDto? FineAssessed,
-    string? HoldReadyFor);
+    string? HoldReadyFor,
+    string Outcome,
+    IReadOnlyList<FineDto> FinesAssessed,
+    bool ReturnedAtDifferentBranch,
+    string? HomeBranchName);
+
+/// <summary>Outcome of writing a loaned copy off as lost.</summary>
+public sealed record LostBookResultDto(LoanDto Loan, FineDto? ReplacementCharge);

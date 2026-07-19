@@ -26,6 +26,11 @@ public class Loan : IAuditable
     /// <summary>Whole days past due at return time; 0 for on-time returns. Null while active.</summary>
     public int? DaysLate { get; set; }
 
+    /// <summary>The branch that physically received the return, when a desk branch was set.</summary>
+    public Guid? ReturnBranchId { get; set; }
+
+    public Branch? ReturnBranch { get; set; }
+
     public int RenewalCount { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }

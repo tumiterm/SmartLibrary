@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartLibrary.Application.Abstractions;
 using SmartLibrary.Domain.Catalog;
 using SmartLibrary.Domain.Circulation;
+using SmartLibrary.Domain.Inventory;
 using SmartLibrary.Domain.Members;
 
 namespace SmartLibrary.Infrastructure.Persistence;
@@ -34,6 +35,8 @@ public class AppDbContext : MultiTenantDbContext, IUnitOfWork
     public DbSet<Hold> Holds => Set<Hold>();
 
     public DbSet<BranchTransfer> BranchTransfers => Set<BranchTransfer>();
+
+    public DbSet<Stocktake> Stocktakes => Set<Stocktake>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

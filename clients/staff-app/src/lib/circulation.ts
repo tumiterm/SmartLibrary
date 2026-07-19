@@ -43,12 +43,23 @@ export interface CheckoutResult {
   failures: CheckoutFailure[]
 }
 
+export type ReturnOutcome = 'Normal' | 'Damaged'
+
 export interface ReturnResult {
   loan: Loan
   wasLate: boolean
   daysLate: number
   fineAssessed: Fine | null
   holdReadyFor: string | null
+  outcome: ReturnOutcome
+  finesAssessed: Fine[]
+  returnedAtDifferentBranch: boolean
+  homeBranchName: string | null
+}
+
+export interface LostBookResult {
+  loan: Loan
+  replacementCharge: Fine | null
 }
 
 export type HoldStatus = 'Pending' | 'Ready' | 'Fulfilled' | 'Cancelled' | 'Expired'
@@ -66,6 +77,17 @@ export interface Hold {
   queuePosition: number | null
 }
 
+export type TransferStatus =
+  | 'Requested'
+  | 'InTransit'
+  | 'Received'
+  | 'Rejected'
+  | 'Cancelled'
+  | 'LostInTransit'
+  | 'DamagedInTransit'
+
+export type TransferAction = 'Dispatch' | 'Reject' | 'Cancel' | 'LostInTransit' | 'DamagedInTransit'
+
 export interface Transfer {
   id: string
   barcode: string
@@ -73,8 +95,49 @@ export interface Transfer {
   bookTitle: string
   fromBranchName: string | null
   toBranchName: string
+  status: TransferStatus
   requestedAtUtc: string
+  dispatchedAtUtc: string | null
   completedAtUtc: string | null
+  requestedBy: string | null
+  notes: string | null
+}
+
+export interface Stocktake {
+  id: string
+  branchId: string | null
+  branchName: string | null
+  status: 'Open' | 'Completed' | 'Cancelled'
+  startedAtUtc: string
+  completedAtUtc: string | null
+  expectedCount: number
+  scannedCount: number
+  missingCount: number
+  foundCount: number
+  startedBy: string | null
+}
+
+export interface StocktakeCopy {
+  copyId: string
+  barcode: string
+  bookId: string
+  bookTitle: string
+  status: string
+  branchName: string | null
+}
+
+export interface ScanResult {
+  stocktake: Stocktake
+  barcode: string
+  bookTitle: string
+  wasFound: boolean
+  alreadyScanned: boolean
+}
+
+export interface StocktakeReport {
+  stocktake: Stocktake
+  missing: StocktakeCopy[]
+  found: StocktakeCopy[]
 }
 
 export interface ReaderScore {

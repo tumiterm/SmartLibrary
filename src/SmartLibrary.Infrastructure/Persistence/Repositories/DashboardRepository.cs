@@ -7,11 +7,14 @@ using SmartLibrary.Domain.Members;
 
 namespace SmartLibrary.Infrastructure.Persistence.Repositories;
 
-public sealed class DashboardRepository(AppDbContext dbContext) : IDashboardRepository
+public sealed class DashboardRepository(
+    AppDbContext dbContext,
+    ICirculationPolicyProvider policyProvider) : IDashboardRepository
 {
     public async Task<DashboardDto> GetAsync(CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
+        var policy = await policyProvider.GetAsync(cancellationToken);
 
         var totalBooks = await dbContext.Books.CountAsync(cancellationToken);
         var totalCopies = await dbContext.BookCopies.CountAsync(cancellationToken);
@@ -39,6 +42,20 @@ public sealed class DashboardRepository(AppDbContext dbContext) : IDashboardRepo
             .Take(10)
             .ToListAsync(cancellationToken);
 
+        var lowStock = await dbContext.Books
+            .Where(b => b.Copies.Count > 0)
+            .Select(b => new
+            {
+                b.Id,
+                b.Title,
+                Total = b.Copies.Count,
+                Available = b.Copies.Count(c => c.Status == CopyStatus.Available),
+            })
+            .Where(x => x.Available <= policy.LowStockThreshold)
+            .OrderBy(x => x.Available)
+            .Take(10)
+            .ToListAsync(cancellationToken);
+
         var activity = recentLoans
             .Select(l => new ActivityItemDto(
                 l.ReturnedAtUtc is null ? "Borrowed" : "Returned",
@@ -59,6 +76,7 @@ public sealed class DashboardRepository(AppDbContext dbContext) : IDashboardRepo
             pendingTransfers,
             readyHolds,
             outstandingFines,
-            activity);
+            activity,
+            [.. lowStock.Select(x => new LowStockItemDto(x.Id, x.Title, x.Available, x.Total))]);
     }
 }

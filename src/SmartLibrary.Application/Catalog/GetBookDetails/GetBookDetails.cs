@@ -12,7 +12,8 @@ public sealed class GetBookDetailsQueryHandler(
     ILoanRepository loans,
     IHoldRepository holds,
     HoldExpiryService holdExpiry,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    ICirculationPolicyProvider policyProvider)
     : IRequestHandler<GetBookDetailsQuery, BookDetailsDto>
 {
     public async Task<BookDetailsDto> Handle(GetBookDetailsQuery request, CancellationToken cancellationToken)
@@ -28,6 +29,7 @@ public sealed class GetBookDetailsQueryHandler(
 
         var history = await loans.GetByBookAsync(book.Id, limit: 20, cancellationToken);
         var queue = await holds.GetQueueByBookAsync(book.Id, cancellationToken);
+        var policy = await policyProvider.GetAsync(cancellationToken);
 
         return BookDetailsDto.FromEntity(
             book,
@@ -43,6 +45,7 @@ public sealed class GetBookDetailsQueryHandler(
                 h.Member?.MembershipNumber ?? "—",
                 h.Status.ToString(),
                 h.PlacedAtUtc,
-                i + 1))]);
+                i + 1))],
+            policy.LowStockThreshold);
     }
 }

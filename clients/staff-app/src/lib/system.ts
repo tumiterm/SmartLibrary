@@ -9,6 +9,13 @@ export interface ActivityItem {
   atUtc: string
 }
 
+export interface LowStockItem {
+  bookId: string
+  title: string
+  available: number
+  total: number
+}
+
 export interface Dashboard {
   totalBooks: number
   totalCopies: number
@@ -20,6 +27,7 @@ export interface Dashboard {
   readyHolds: number
   outstandingFines: number
   recentActivity: ActivityItem[]
+  lowStock: LowStockItem[]
 }
 
 export interface LibrarySettings {
@@ -29,6 +37,8 @@ export interface LibrarySettings {
   fineBlockThreshold: number
   maxRenewals: number
   holdPickupDays: number
+  lowStockThreshold: number
+  maxOverdueItems: number
   isCustomized: boolean
 }
 
