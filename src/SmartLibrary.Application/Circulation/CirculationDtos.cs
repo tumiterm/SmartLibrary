@@ -42,7 +42,8 @@ public sealed record FineDto(
     string Reason,
     string Status,
     DateTime AssessedAtUtc,
-    DateTime? SettledAtUtc)
+    DateTime? SettledAtUtc,
+    string? Notes)
 {
     public static FineDto FromEntity(Fine fine) => new(
         fine.Id,
@@ -53,7 +54,8 @@ public sealed record FineDto(
         fine.Reason.ToString(),
         fine.Status.ToString(),
         fine.AssessedAtUtc,
-        fine.SettledAtUtc);
+        fine.SettledAtUtc,
+        fine.Notes);
 }
 
 /// <summary>Outcome of a return scan — includes the fine when the return was late.</summary>

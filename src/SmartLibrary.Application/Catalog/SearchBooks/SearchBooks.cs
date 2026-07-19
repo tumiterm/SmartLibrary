@@ -21,6 +21,7 @@ public sealed record BookListItemDto(
 public sealed record SearchBooksQuery(
     string? Search,
     BookFormat? Format,
+    Guid? BranchId = null,
     int Page = 1,
     int PageSize = 20) : IRequest<PagedResult<BookListItemDto>>;
 
@@ -43,6 +44,7 @@ public sealed class SearchBooksQueryHandler(IBookRepository books)
         var (items, total) = await books.SearchAsync(
             request.Search?.Trim(),
             request.Format,
+            request.BranchId,
             request.Page,
             request.PageSize,
             cancellationToken);

@@ -11,6 +11,7 @@ import { DashboardPage } from '@/pages/dashboard-page'
 import { MemberDetailsPage } from '@/pages/member-details-page'
 import { MembersPage } from '@/pages/members-page'
 import { RegisterMemberPage } from '@/pages/register-member-page'
+import { SettingsPage } from '@/pages/settings-page'
 
 const queryClient = new QueryClient()
 
@@ -34,6 +35,7 @@ export default function App() {
               <Route path="patrons" element={<MembersPage />} />
               <Route path="patrons/register" element={<RegisterMemberPage />} />
               <Route path="patrons/:id" element={<MemberDetailsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

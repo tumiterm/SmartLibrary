@@ -114,9 +114,19 @@ public class LookupBookByIsbnQueryHandlerTests
         public Task<BookCopy?> GetCopyByBarcodeAsync(string barcode, CancellationToken cancellationToken) =>
             Task.FromResult<BookCopy?>(null);
 
+        public Task<BookCopy?> GetCopyByIdAsync(Guid copyId, CancellationToken cancellationToken) =>
+            Task.FromResult<BookCopy?>(null);
+
+        public Task<IReadOnlyList<BookCopy>> SearchCopiesByBarcodeAsync(
+            string barcode,
+            int limit,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<BookCopy>>([]);
+
         public Task<(IReadOnlyList<Book> Books, int TotalCount)> SearchAsync(
             string? search,
             BookFormat? format,
+            Guid? branchId,
             int page,
             int pageSize,
             CancellationToken cancellationToken) =>

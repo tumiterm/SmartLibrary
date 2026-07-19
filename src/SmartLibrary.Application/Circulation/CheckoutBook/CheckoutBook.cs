@@ -1,7 +1,7 @@
 using FluentValidation;
 using MediatR;
-using Microsoft.Extensions.Options;
 using SmartLibrary.Application.Abstractions;
+using SmartLibrary.Application.Circulation.Holds;
 using SmartLibrary.Application.Common.Exceptions;
 using SmartLibrary.Domain.Catalog;
 using SmartLibrary.Domain.Circulation;
@@ -10,35 +10,47 @@ using SmartLibrary.Domain.Members;
 namespace SmartLibrary.Application.Circulation.CheckoutBook;
 
 /// <summary>
-/// Scan-first checkout: the membership card number and the copy barcode are
-/// exactly what a scanner produces at the desk.
+/// Scan-first checkout of one or many copies in a single transaction: the card
+/// number and copy barcodes are exactly what a scanner produces at the desk.
+/// Per-copy failures don't sink the batch — they're reported alongside successes.
 /// </summary>
-public sealed record CheckoutBookCommand(string MembershipNumber, string Barcode) : IRequest<LoanDto>;
+public sealed record CheckoutBooksCommand(
+    string MembershipNumber,
+    IReadOnlyList<string> Barcodes) : IRequest<CheckoutResultDto>;
 
-public sealed class CheckoutBookCommandValidator : AbstractValidator<CheckoutBookCommand>
+public sealed record CheckoutFailureDto(string Barcode, string Error);
+
+public sealed record CheckoutResultDto(
+    IReadOnlyList<LoanDto> Loans,
+    IReadOnlyList<CheckoutFailureDto> Failures);
+
+public sealed class CheckoutBooksCommandValidator : AbstractValidator<CheckoutBooksCommand>
 {
-    public CheckoutBookCommandValidator()
+    public CheckoutBooksCommandValidator()
     {
         RuleFor(c => c.MembershipNumber).NotEmpty().MaximumLength(20);
-        RuleFor(c => c.Barcode).NotEmpty().MaximumLength(100);
+        RuleFor(c => c.Barcodes).NotEmpty().WithMessage("Scan at least one book.");
+        RuleForEach(c => c.Barcodes).NotEmpty().MaximumLength(100);
     }
 }
 
-public sealed class CheckoutBookCommandHandler(
+public sealed class CheckoutBooksCommandHandler(
     IMemberRepository members,
     IBookRepository books,
     ILoanRepository loans,
     IFineRepository fines,
     IHoldRepository holds,
+    HoldExpiryService holdExpiry,
     IUnitOfWork unitOfWork,
-    IOptions<CirculationOptions> options)
-    : IRequestHandler<CheckoutBookCommand, LoanDto>
+    ICirculationPolicyProvider policyProvider)
+    : IRequestHandler<CheckoutBooksCommand, CheckoutResultDto>
 {
-    public async Task<LoanDto> Handle(CheckoutBookCommand request, CancellationToken cancellationToken)
+    public async Task<CheckoutResultDto> Handle(CheckoutBooksCommand request, CancellationToken cancellationToken)
     {
-        var policy = options.Value;
+        var policy = await policyProvider.GetAsync(cancellationToken);
         var now = DateTime.UtcNow;
 
+        // Member-level gates apply to the whole batch.
         var member = await members.GetByMembershipNumberAsync(request.MembershipNumber.Trim(), cancellationToken)
             ?? throw new NotFoundException($"No member holds card {request.MembershipNumber}.");
 
@@ -52,8 +64,56 @@ public sealed class CheckoutBookCommandHandler(
             throw new ConflictException($"{member.FullName}'s membership expired on {expiry:yyyy-MM-dd}.");
         }
 
-        var copy = await books.GetCopyByBarcodeAsync(request.Barcode.Trim(), cancellationToken)
-            ?? throw new NotFoundException($"No copy has barcode {request.Barcode}.");
+        var owed = await fines.OutstandingTotalByMemberAsync(member.Id, cancellationToken);
+        if (owed >= policy.FineBlockThreshold)
+        {
+            throw new ConflictException(
+                $"{member.FullName} owes {owed:0.00} in fines (limit {policy.FineBlockThreshold:0.00}). Settle first.");
+        }
+
+        var activeLoans = await loans.CountActiveByMemberAsync(member.Id, cancellationToken);
+
+        var successes = new List<LoanDto>();
+        var failures = new List<CheckoutFailureDto>();
+
+        foreach (var rawBarcode in request.Barcodes.Select(b => b.Trim()).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                if (activeLoans + successes.Count >= policy.MaxActiveLoans)
+                {
+                    throw new ConflictException(
+                        $"{member.FullName} is at the loan limit of {policy.MaxActiveLoans}.");
+                }
+
+                var loan = await CheckoutOneAsync(member, rawBarcode, policy, now, cancellationToken);
+                successes.Add(LoanDto.FromEntity(loan));
+            }
+            catch (Exception ex) when (ex is ConflictException or NotFoundException)
+            {
+                failures.Add(new CheckoutFailureDto(rawBarcode, ex.Message));
+            }
+        }
+
+        if (successes.Count > 0)
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        return new CheckoutResultDto(successes, failures);
+    }
+
+    private async Task<Loan> CheckoutOneAsync(
+        Member member,
+        string barcode,
+        CirculationOptions policy,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var copy = await books.GetCopyByBarcodeAsync(barcode, cancellationToken)
+            ?? throw new NotFoundException($"No copy has barcode {barcode}.");
+
+        await holdExpiry.ExpireStaleAsync(copy.BookId, cancellationToken);
 
         // A copy set aside for a hold may only leave with the member it's reserved for.
         Hold? readyHold = null;
@@ -71,20 +131,6 @@ public sealed class CheckoutBookCommandHandler(
             throw new ConflictException($"Copy {copy.Barcode} is {copy.Status}, not available.");
         }
 
-        var activeLoans = await loans.CountActiveByMemberAsync(member.Id, cancellationToken);
-        if (activeLoans >= policy.MaxActiveLoans)
-        {
-            throw new ConflictException(
-                $"{member.FullName} already has {activeLoans} of {policy.MaxActiveLoans} allowed loans.");
-        }
-
-        var owed = await fines.OutstandingTotalByMemberAsync(member.Id, cancellationToken);
-        if (owed >= policy.FineBlockThreshold)
-        {
-            throw new ConflictException(
-                $"{member.FullName} owes {owed:0.00} in fines (limit {policy.FineBlockThreshold:0.00}). Settle first.");
-        }
-
         var loan = new Loan
         {
             MemberId = member.Id,
@@ -99,15 +145,14 @@ public sealed class CheckoutBookCommandHandler(
         loans.Add(loan);
 
         // Collecting the book resolves the member's hold on it (reserved copy or otherwise).
-        var memberHold = readyHold ?? await holds.GetActiveByMemberAndBookAsync(member.Id, copy.BookId, cancellationToken);
+        var memberHold = readyHold
+            ?? await holds.GetActiveByMemberAndBookAsync(member.Id, copy.BookId, cancellationToken);
         if (memberHold is not null)
         {
             memberHold.Status = HoldStatus.Fulfilled;
             memberHold.ResolvedAtUtc = now;
         }
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        return LoanDto.FromEntity(loan);
+        return loan;
     }
 }

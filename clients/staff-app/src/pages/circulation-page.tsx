@@ -19,7 +19,7 @@ import { Input, Select } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
 import {
-  checkoutBook,
+  checkoutBooks,
   createTransfer,
   getActiveLoans,
   getBranches,
@@ -36,19 +36,42 @@ function formatDue(value: string) {
 function CheckoutPanel({ onDone }: { onDone: () => void }) {
   const [card, setCard] = useState('')
   const [barcode, setBarcode] = useState('')
+  const [scanned, setScanned] = useState<string[]>([])
+
+  const addBarcode = () => {
+    const value = barcode.trim()
+    if (!value) return
+    if (!scanned.some((b) => b.toLowerCase() === value.toLowerCase())) {
+      setScanned((s) => [...s, value])
+    }
+    setBarcode('')
+  }
 
   const mutation = useMutation({
-    mutationFn: () => checkoutBook(card.trim(), barcode.trim()),
-    onSuccess: (loan) => {
-      toast.success(`Checked out to ${loan.memberName}`, {
-        description: `${loan.bookTitle} — due ${formatDue(loan.dueAtUtc)}`,
-      })
+    mutationFn: () => {
+      const pending = barcode.trim() && !scanned.includes(barcode.trim()) ? [...scanned, barcode.trim()] : scanned
+      return checkoutBooks(card.trim(), pending)
+    },
+    onSuccess: (result) => {
+      if (result.loans.length > 0) {
+        const first = result.loans[0]
+        toast.success(
+          `${result.loans.length} book${result.loans.length === 1 ? '' : 's'} checked out to ${first.memberName}`,
+          { description: `Due ${formatDue(first.dueAtUtc)}` },
+        )
+      }
+      for (const failure of result.failures) {
+        toast.error(`${failure.barcode} refused`, { description: failure.error })
+      }
       setCard('')
       setBarcode('')
+      setScanned([])
       onDone()
     },
     onError: (error: Error) => toast.error('Checkout refused', { description: error.message }),
   })
+
+  const total = scanned.length + (barcode.trim() ? 1 : 0)
 
   return (
     <Card>
@@ -57,7 +80,7 @@ function CheckoutPanel({ onDone }: { onDone: () => void }) {
           <ArrowUpFromLine className="size-4 text-accent" />
           Check out
         </CardTitle>
-        <CardDescription>Scan the member's card, then the book.</CardDescription>
+        <CardDescription>Scan the card, then every book — one transaction.</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -81,21 +104,43 @@ function CheckoutPanel({ onDone }: { onDone: () => void }) {
             </div>
           </div>
           <div>
-            <Label htmlFor="co-barcode">Copy barcode</Label>
+            <Label htmlFor="co-barcode">Copy barcodes</Label>
             <div className="relative">
               <ScanBarcode className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-faint" />
               <Input
                 id="co-barcode"
-                placeholder="BC-0000"
+                placeholder="Scan, Enter, repeat…"
                 className="pl-10 font-mono"
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
+                onKeyDown={(e) => {
+                  // Barcode scanners terminate with Enter — collect, don't submit.
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addBarcode()
+                  }
+                }}
               />
             </div>
+            {scanned.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {scanned.map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    title="Remove"
+                    className="cursor-pointer rounded-full border border-border bg-surface-2 px-2 py-0.5 font-mono text-xs text-muted transition-colors hover:border-danger hover:text-danger"
+                    onClick={() => setScanned((s) => s.filter((x) => x !== b))}
+                  >
+                    {b} ×
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <Button type="submit" disabled={mutation.isPending || !card.trim() || !barcode.trim()}>
+          <Button type="submit" disabled={mutation.isPending || !card.trim() || total === 0}>
             {mutation.isPending ? <Spinner /> : <ArrowUpFromLine className="size-4" />}
-            Check out
+            Check out {total > 1 ? `${total} books` : ''}
           </Button>
         </form>
       </CardContent>
@@ -296,7 +341,10 @@ function TransferPanel({ onDone }: { onDone: () => void }) {
 
 export function CirculationPage() {
   const queryClient = useQueryClient()
+  const [overdueOnly, setOverdueOnly] = useState(false)
   const loans = useQuery({ queryKey: ['active-loans'], queryFn: getActiveLoans })
+  const visibleLoans = (loans.data ?? []).filter((l) => !overdueOnly || l.isOverdue)
+  const overdueCount = (loans.data ?? []).filter((l) => l.isOverdue).length
   const transfers = useQuery({ queryKey: ['pending-transfers'], queryFn: getPendingTransfers })
 
   const receive = useMutation({
@@ -383,20 +431,34 @@ export function CirculationPage() {
 
       <Card className="animate-rise">
         <CardHeader>
-          <CardTitle>On loan now</CardTitle>
-          <CardDescription>
-            {loans.data ? `${loans.data.length} active loan${loans.data.length === 1 ? '' : 's'}, soonest due first.` : 'Loading…'}
-          </CardDescription>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle>On loan now</CardTitle>
+              <CardDescription>
+                {loans.data ? `${loans.data.length} active loan${loans.data.length === 1 ? '' : 's'}, soonest due first.` : 'Loading…'}
+              </CardDescription>
+            </div>
+            {overdueCount > 0 && (
+              <Button
+                variant={overdueOnly ? 'danger' : 'secondary'}
+                size="sm"
+                onClick={() => setOverdueOnly((v) => !v)}
+              >
+                <AlarmClock className="size-4" />
+                {overdueOnly ? 'Showing overdue' : `Overdue (${overdueCount})`}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loans.isPending ? (
             <div className="grid min-h-24 place-items-center text-muted">
               <Spinner className="size-5" />
             </div>
-          ) : !loans.data || loans.data.length === 0 ? (
+          ) : visibleLoans.length === 0 ? (
             <div className="flex items-center gap-3 rounded-xl border border-dashed border-border-strong bg-surface-2 px-4 py-6 text-sm text-muted">
               <AlarmClock className="size-4 shrink-0" />
-              Nothing is out right now.
+              {overdueOnly ? 'Nothing is overdue. Well-behaved patrons.' : 'Nothing is out right now.'}
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-border">
@@ -410,7 +472,7 @@ export function CirculationPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {loans.data.map((loan) => (
+                  {visibleLoans.map((loan) => (
                     <tr key={loan.id} className="border-b border-border last:border-0">
                       <td className="px-4 py-2.5">
                         {loan.bookId ? (

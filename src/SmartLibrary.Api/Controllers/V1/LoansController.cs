@@ -21,19 +21,21 @@ public sealed class LoansController(ISender sender) : ControllerBase
     public async Task<ActionResult<IReadOnlyList<LoanDto>>> GetActive(CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetActiveLoansQuery(), cancellationToken));
 
-    /// <summary>Checkout: scan the member's card, scan the copy's barcode.</summary>
+    /// <summary>Checkout: scan the member's card, then one or many copy barcodes. Per-copy failures are reported alongside successes.</summary>
     [HttpPost]
-    [ProducesResponseType<LoanDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType<CheckoutResultDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<LoanDto>> Checkout(CheckoutRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<CheckoutResultDto>> Checkout(
+        CheckoutRequest request,
+        CancellationToken cancellationToken)
     {
-        var loan = await sender.Send(
-            new CheckoutBookCommand(request.MembershipNumber, request.Barcode),
+        var result = await sender.Send(
+            new CheckoutBooksCommand(request.MembershipNumber, request.Barcodes),
             cancellationToken);
 
-        return CreatedAtAction(nameof(GetActive), new { version = "1" }, loan);
+        return CreatedAtAction(nameof(GetActive), new { version = "1" }, result);
     }
 
     /// <summary>Return: one barcode scan finds and closes the active loan; assesses an overdue fine when late.</summary>
@@ -61,11 +63,11 @@ public sealed class LoansController(ISender sender) : ControllerBase
         Guid fineId,
         SettleFineRequest request,
         CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new SettleFineCommand(fineId, request.Waive), cancellationToken));
+        Ok(await sender.Send(new SettleFineCommand(fineId, request.Waive, request.Reason), cancellationToken));
 }
 
-public sealed record CheckoutRequest(string MembershipNumber, string Barcode);
+public sealed record CheckoutRequest(string MembershipNumber, IReadOnlyList<string> Barcodes);
 
 public sealed record ReturnRequest(string Barcode);
 
-public sealed record SettleFineRequest(bool Waive = false);
+public sealed record SettleFineRequest(bool Waive = false, string? Reason = null);

@@ -31,8 +31,11 @@ public static class DependencyInjection
         services.AddScoped<IFineRepository, FineRepository>();
         services.AddScoped<IHoldRepository, HoldRepository>();
         services.AddScoped<ITransferRepository, TransferRepository>();
+        services.AddScoped<ILibrarySettingsRepository, LibrarySettingsRepository>();
+        services.AddScoped<IDashboardRepository, DashboardRepository>();
 
         services.Configure<CirculationOptions>(configuration.GetSection(CirculationOptions.SectionName));
+        services.AddScoped<ICirculationPolicyProvider, CirculationPolicyProvider>();
 
         services.Configure<GoogleBooksOptions>(configuration.GetSection(GoogleBooksOptions.SectionName));
         services.AddHttpClient<IBookMetadataProvider, GoogleBooksMetadataProvider>(client =>

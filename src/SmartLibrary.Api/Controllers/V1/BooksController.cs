@@ -7,6 +7,7 @@ using SmartLibrary.Application.Catalog.AddBookCopy;
 using SmartLibrary.Application.Catalog.GetBookDetails;
 using SmartLibrary.Application.Catalog.Lookup;
 using SmartLibrary.Application.Catalog.SearchBooks;
+using SmartLibrary.Application.Catalog.SetCopyStatus;
 using SmartLibrary.Application.Catalog.UpdateBook;
 using SmartLibrary.Application.Common.Models;
 using SmartLibrary.Domain.Catalog;
@@ -35,10 +36,11 @@ public sealed class BooksController(ISender sender) : ControllerBase
     public async Task<ActionResult<PagedResult<BookListItemDto>>> Search(
         [FromQuery] string? search,
         [FromQuery] BookFormat? format,
+        [FromQuery] Guid? branchId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default) =>
-        Ok(await sender.Send(new SearchBooksQuery(search, format, page, pageSize), cancellationToken));
+        Ok(await sender.Send(new SearchBooksQuery(search, format, branchId, page, pageSize), cancellationToken));
 
     /// <summary>Full record: metadata, cover, copies with availability, borrow history.</summary>
     [HttpGet("{id:guid}")]
@@ -124,7 +126,23 @@ public sealed class BooksController(ISender sender) : ControllerBase
 
         return CreatedAtAction(nameof(GetById), new { id, version = "1" }, new { id = copyId });
     }
+
+    /// <summary>Marks a copy Lost/Damaged/Withdrawn, or restores it to Available.</summary>
+    [HttpPost("copies/{copyId:guid}/status")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> SetCopyStatus(
+        Guid copyId,
+        SetCopyStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new SetCopyStatusCommand(copyId, request.Status), cancellationToken);
+        return NoContent();
+    }
 }
+
+public sealed record SetCopyStatusRequest(CopyStatus Status);
 
 public sealed record AddBookRequest(
     string? Isbn,

@@ -30,6 +30,17 @@ export interface Fine {
   status: FineStatus
   assessedAtUtc: string
   settledAtUtc: string | null
+  notes: string | null
+}
+
+export interface CheckoutFailure {
+  barcode: string
+  error: string
+}
+
+export interface CheckoutResult {
+  loans: Loan[]
+  failures: CheckoutFailure[]
 }
 
 export interface ReturnResult {

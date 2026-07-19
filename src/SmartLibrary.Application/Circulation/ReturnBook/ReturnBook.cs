@@ -1,6 +1,5 @@
 using FluentValidation;
 using MediatR;
-using Microsoft.Extensions.Options;
 using SmartLibrary.Application.Abstractions;
 using SmartLibrary.Application.Common.Exceptions;
 using SmartLibrary.Domain.Catalog;
@@ -24,11 +23,12 @@ public sealed class ReturnBookCommandHandler(
     IFineRepository fines,
     IHoldRepository holds,
     IUnitOfWork unitOfWork,
-    IOptions<CirculationOptions> options)
+    ICirculationPolicyProvider policyProvider)
     : IRequestHandler<ReturnBookCommand, ReturnResultDto>
 {
     public async Task<ReturnResultDto> Handle(ReturnBookCommand request, CancellationToken cancellationToken)
     {
+        var policy = await policyProvider.GetAsync(cancellationToken);
         var loan = await loans.GetActiveByCopyBarcodeAsync(request.Barcode.Trim(), cancellationToken)
             ?? throw new NotFoundException($"No copy with barcode {request.Barcode} is currently on loan.");
 
@@ -48,7 +48,7 @@ public sealed class ReturnBookCommandHandler(
                 Member = loan.Member,
                 LoanId = loan.Id,
                 Loan = loan,
-                Amount = daysLate * options.Value.DailyFineAmount,
+                Amount = daysLate * policy.DailyFineAmount,
                 Reason = FineReason.Overdue,
             };
             fines.Add(fine);

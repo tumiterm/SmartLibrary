@@ -9,8 +9,10 @@ import type {
   Branch,
   PagedResult,
 } from './catalog'
-import type { Fine, Hold, Loan, MemberProfile, ReturnResult, Transfer } from './circulation'
-import type { Member, RegisterMemberRequest } from './members'
+import type { CheckoutResult, Fine, Hold, Loan, MemberProfile, ReturnResult, Transfer } from './circulation'
+import type { CopyStatus } from './catalog'
+import type { Member, MemberStatus, RegisterMemberRequest } from './members'
+import type { Dashboard, GlobalSearchResult, LibrarySettings } from './system'
 
 const BASE = '/api/v1'
 
@@ -131,10 +133,10 @@ export function getActiveLoans(): Promise<Loan[]> {
   return request<Loan[]>('/loans/active')
 }
 
-export function checkoutBook(membershipNumber: string, barcode: string): Promise<Loan> {
-  return request<Loan>('/loans', {
+export function checkoutBooks(membershipNumber: string, barcodes: string[]): Promise<CheckoutResult> {
+  return request<CheckoutResult>('/loans', {
     method: 'POST',
-    body: JSON.stringify({ membershipNumber, barcode }),
+    body: JSON.stringify({ membershipNumber, barcodes }),
   })
 }
 
@@ -145,21 +147,57 @@ export function returnBook(barcode: string): Promise<ReturnResult> {
   })
 }
 
-export function settleFine(fineId: string, waive: boolean): Promise<Fine> {
+export function settleFine(fineId: string, waive: boolean, reason?: string): Promise<Fine> {
   return request<Fine>(`/loans/fines/${fineId}/settle`, {
     method: 'POST',
-    body: JSON.stringify({ waive }),
+    body: JSON.stringify({ waive, reason: reason ?? null }),
+  })
+}
+
+export function getDashboard(): Promise<Dashboard> {
+  return request<Dashboard>('/dashboard')
+}
+
+export function globalSearch(q: string): Promise<GlobalSearchResult> {
+  return request<GlobalSearchResult>(`/search?q=${encodeURIComponent(q)}`)
+}
+
+export function getSettings(): Promise<LibrarySettings> {
+  return request<LibrarySettings>('/settings')
+}
+
+export function updateSettings(body: Omit<LibrarySettings, 'isCustomized'>): Promise<LibrarySettings> {
+  return request<LibrarySettings>('/settings', { method: 'PUT', body: JSON.stringify(body) })
+}
+
+export function setCopyStatus(copyId: string, status: CopyStatus): Promise<void> {
+  return requestVoid(`/books/copies/${copyId}/status`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  })
+}
+
+export function updateMember(id: string, body: RegisterMemberRequest): Promise<Member> {
+  return request<Member>(`/members/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+}
+
+export function setMemberStatus(id: string, status: MemberStatus): Promise<Member> {
+  return request<Member>(`/members/${id}/status`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
   })
 }
 
 export function searchBooks(params: {
   search?: string
   format?: BookFormat | ''
+  branchId?: string
   page?: number
 }): Promise<PagedResult<BookListItem>> {
   const qs = new URLSearchParams()
   if (params.search) qs.set('search', params.search)
   if (params.format) qs.set('format', params.format)
+  if (params.branchId) qs.set('branchId', params.branchId)
   if (params.page) qs.set('page', String(params.page))
   const suffix = qs.toString() ? `?${qs.toString()}` : ''
   return request<PagedResult<BookListItem>>(`/books${suffix}`)

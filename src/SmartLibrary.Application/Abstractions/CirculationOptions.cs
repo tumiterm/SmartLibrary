@@ -15,4 +15,16 @@ public sealed class CirculationOptions
     public decimal FineBlockThreshold { get; set; } = 100.00m;
 
     public int MaxRenewals { get; set; } = 2;
+
+    /// <summary>Days a member has to collect a ready reservation before it expires.</summary>
+    public int HoldPickupDays { get; set; } = 3;
+}
+
+/// <summary>
+/// Resolves the effective circulation policy for the current tenant:
+/// the tenant's own LibrarySettings row when present, platform defaults otherwise.
+/// </summary>
+public interface ICirculationPolicyProvider
+{
+    Task<CirculationOptions> GetAsync(CancellationToken cancellationToken);
 }

@@ -7,18 +7,20 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Select } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { searchBooks } from '@/lib/api'
+import { getBranches, searchBooks } from '@/lib/api'
 import { BOOK_FORMATS, type BookFormat } from '@/lib/catalog'
 
 export function CatalogPage() {
   const [search, setSearch] = useState('')
   const [format, setFormat] = useState<BookFormat | ''>('')
+  const [branchId, setBranchId] = useState('')
   const [page, setPage] = useState(1)
   const navigate = useNavigate()
 
+  const branches = useQuery({ queryKey: ['branches'], queryFn: getBranches })
   const books = useQuery({
-    queryKey: ['books', search, format, page],
-    queryFn: () => searchBooks({ search, format, page }),
+    queryKey: ['books', search, format, branchId, page],
+    queryFn: () => searchBooks({ search, format, branchId, page }),
   })
 
   const totalPages = books.data ? Math.max(1, Math.ceil(books.data.totalCount / books.data.pageSize)) : 1
@@ -56,7 +58,7 @@ export function CatalogPage() {
             </div>
             <Select
               aria-label="Filter by format"
-              className="sm:w-44"
+              className="sm:w-40"
               value={format}
               onChange={(e) => {
                 setFormat(e.target.value as BookFormat | '')
@@ -67,6 +69,22 @@ export function CatalogPage() {
               {BOOK_FORMATS.map((f) => (
                 <option key={f.value} value={f.value}>
                   {f.label}
+                </option>
+              ))}
+            </Select>
+            <Select
+              aria-label="Filter by branch"
+              className="sm:w-44"
+              value={branchId}
+              onChange={(e) => {
+                setBranchId(e.target.value)
+                setPage(1)
+              }}
+            >
+              <option value="">All branches</option>
+              {branches.data?.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
                 </option>
               ))}
             </Select>

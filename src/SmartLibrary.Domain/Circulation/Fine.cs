@@ -26,6 +26,9 @@ public class Fine : IAuditable
 
     public DateTime? SettledAtUtc { get; set; }
 
+    /// <summary>Free-text context — e.g. the reason a fine was waived or adjusted.</summary>
+    public string? Notes { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }

@@ -6,20 +6,32 @@ import {
   HandCoins,
   Hourglass,
   Mail,
+  Pencil,
   Phone,
   ShieldCheck,
+  ShieldOff,
   Sparkles,
 } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { MembershipCard } from '@/components/membership-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input, Select } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
-import { cancelHold, getMember, settleFine } from '@/lib/api'
+import {
+  cancelHold,
+  getBranches,
+  getMember,
+  setMemberStatus,
+  settleFine,
+  updateMember,
+} from '@/lib/api'
 import type { ReaderScore } from '@/lib/circulation'
-import type { MemberStatus } from '@/lib/members'
+import { MEMBER_TYPES, type Member, type MemberStatus, type MemberType } from '@/lib/members'
 
 const STATUS_VARIANT: Record<MemberStatus, 'success' | 'danger' | 'neutral'> = {
   Active: 'success',
@@ -85,6 +97,104 @@ function ReaderScoreCard({ score }: { score: ReaderScore }) {
   )
 }
 
+/* ── Edit member form ─────────────────────────────────────────────────────── */
+
+function EditMemberForm({ member, onDone }: { member: Member; onDone: () => void }) {
+  const [firstName, setFirstName] = useState(member.firstName)
+  const [lastName, setLastName] = useState(member.lastName)
+  const [email, setEmail] = useState(member.email)
+  const [phone, setPhone] = useState(member.phone ?? '')
+  const [type, setType] = useState<MemberType>(member.type)
+  const [branchId, setBranchId] = useState(member.homeBranchId ?? '')
+  const branches = useQuery({ queryKey: ['branches'], queryFn: getBranches })
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      updateMember(member.id, {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        phone: phone.trim() || null,
+        type,
+        homeBranchId: branchId || null,
+      }),
+    onSuccess: () => {
+      toast.success('Member updated')
+      onDone()
+    },
+    onError: (error: Error) => toast.error('Could not update member', { description: error.message }),
+  })
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Pencil className="size-4 text-accent" />
+          Edit details
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            mutation.mutate()
+          }}
+          className="flex flex-col gap-4"
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="e-first">First name</Label>
+              <Input id="e-first" required value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="e-last">Last name</Label>
+              <Input id="e-last" required value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="e-email">Email</Label>
+              <Input id="e-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="e-phone">Phone</Label>
+              <Input id="e-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="e-type">Member type</Label>
+              <Select id="e-type" value={type} onChange={(e) => setType(e.target.value as MemberType)}>
+                {MEMBER_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="e-branch">Home branch</Label>
+              <Select id="e-branch" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
+                <option value="">— Library-wide —</option>
+                {branches.data?.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
+            <Button variant="ghost" onClick={onDone}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? <Spinner /> : <Pencil className="size-4" />}
+              Save
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
+
 /* ── Page ─────────────────────────────────────────────────────────────────── */
 
 export function MemberDetailsPage() {
@@ -97,7 +207,8 @@ export function MemberDetailsPage() {
   })
 
   const settle = useMutation({
-    mutationFn: ({ fineId, waive }: { fineId: string; waive: boolean }) => settleFine(fineId, waive),
+    mutationFn: ({ fineId, waive, reason }: { fineId: string; waive: boolean; reason?: string }) =>
+      settleFine(fineId, waive, reason),
     onSuccess: (fine) => {
       toast.success(fine.status === 'Waived' ? 'Fine waived' : 'Fine paid', {
         description: fine.amount.toFixed(2),
@@ -114,6 +225,19 @@ export function MemberDetailsPage() {
       void queryClient.invalidateQueries({ queryKey: ['member', id] })
     },
     onError: (error: Error) => toast.error('Could not cancel hold', { description: error.message }),
+  })
+
+  const [editing, setEditing] = useState(false)
+  const [waivingId, setWaivingId] = useState<string | null>(null)
+  const [waiveReason, setWaiveReason] = useState('')
+
+  const statusMutation = useMutation({
+    mutationFn: (status: MemberStatus) => setMemberStatus(id!, status),
+    onSuccess: (member) => {
+      toast.success(member.status === 'Suspended' ? 'Membership suspended' : 'Membership reactivated')
+      void queryClient.invalidateQueries({ queryKey: ['member', id] })
+    },
+    onError: (error: Error) => toast.error('Could not change status', { description: error.message }),
   })
 
   if (profile.isPending) {
@@ -151,16 +275,47 @@ export function MemberDetailsPage() {
         </Link>
       </div>
 
-      <header className="animate-fade">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-3xl font-semibold sm:text-4xl">{m.fullName}</h1>
-          <Badge variant={STATUS_VARIANT[m.status]}>{m.status}</Badge>
-          {outstandingFines > 0 && <Badge variant="danger">{outstandingFines.toFixed(2)} owed</Badge>}
+      <header className="flex animate-fade flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-display text-3xl font-semibold sm:text-4xl">{m.fullName}</h1>
+            <Badge variant={STATUS_VARIANT[m.status]}>{m.status}</Badge>
+            {outstandingFines > 0 && <Badge variant="danger">{outstandingFines.toFixed(2)} owed</Badge>}
+          </div>
+          <p className="mt-2 text-sm text-muted">
+            {m.type} member · joined {formatDate(m.joinedAtUtc)}
+          </p>
         </div>
-        <p className="mt-2 text-sm text-muted">
-          {m.type} member · joined {formatDate(m.joinedAtUtc)}
-        </p>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setEditing((v) => !v)}>
+            <Pencil className="size-4" />
+            {editing ? 'Close' : 'Edit'}
+          </Button>
+          {m.status !== 'Expired' && (
+            <Button
+              variant={m.status === 'Active' ? 'ghost' : 'primary'}
+              size="sm"
+              disabled={statusMutation.isPending}
+              onClick={() => statusMutation.mutate(m.status === 'Active' ? 'Suspended' : 'Active')}
+            >
+              {m.status === 'Active' ? <ShieldOff className="size-4" /> : <ShieldCheck className="size-4" />}
+              {m.status === 'Active' ? 'Suspend' : 'Reactivate'}
+            </Button>
+          )}
+        </div>
       </header>
+
+      {editing && (
+        <div className="animate-rise">
+          <EditMemberForm
+            member={m}
+            onDone={() => {
+              setEditing(false)
+              void queryClient.invalidateQueries({ queryKey: ['member', id] })
+            }}
+          />
+        </div>
+      )}
 
       <div className="grid animate-rise gap-6 lg:grid-cols-[minmax(0,28rem)_1fr]">
         <div className="flex flex-col gap-4">
@@ -253,25 +408,56 @@ export function MemberDetailsPage() {
                         </p>
                       </div>
                       {fine.status === 'Outstanding' ? (
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            disabled={settle.isPending}
-                            onClick={() => settle.mutate({ fineId: fine.id, waive: false })}
-                          >
-                            Pay
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={settle.isPending}
-                            onClick={() => settle.mutate({ fineId: fine.id, waive: true })}
-                          >
-                            Waive
-                          </Button>
-                        </div>
+                        waivingId === fine.id ? (
+                          <div className="flex w-full items-center gap-2 sm:w-auto">
+                            <Input
+                              autoFocus
+                              placeholder="Reason for waiving…"
+                              className="h-8 w-44 text-[13px]"
+                              value={waiveReason}
+                              onChange={(e) => setWaiveReason(e.target.value)}
+                            />
+                            <Button
+                              size="sm"
+                              disabled={settle.isPending || !waiveReason.trim()}
+                              onClick={() => {
+                                settle.mutate({ fineId: fine.id, waive: true, reason: waiveReason.trim() })
+                                setWaivingId(null)
+                                setWaiveReason('')
+                              }}
+                            >
+                              Confirm
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setWaivingId(null)}>
+                              ×
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              disabled={settle.isPending}
+                              onClick={() => settle.mutate({ fineId: fine.id, waive: false })}
+                            >
+                              Pay
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={settle.isPending}
+                              onClick={() => {
+                                setWaivingId(fine.id)
+                                setWaiveReason('')
+                              }}
+                            >
+                              Waive
+                            </Button>
+                          </div>
+                        )
                       ) : (
-                        <Badge variant={fine.status === 'Paid' ? 'success' : 'neutral'}>{fine.status}</Badge>
+                        <span title={fine.notes ?? undefined}>
+                          <Badge variant={fine.status === 'Paid' ? 'success' : 'neutral'}>{fine.status}</Badge>
+                        </span>
                       )}
                     </li>
                   ))}

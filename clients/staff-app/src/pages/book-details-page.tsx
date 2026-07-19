@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input, Select } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
-import { addCopy, cancelHold, createBranch, getBook, getBranches, placeHold } from '@/lib/api'
+import { addCopy, cancelHold, createBranch, getBook, getBranches, placeHold, setCopyStatus } from '@/lib/api'
 import {
   BOOK_FORMATS,
   COPY_CONDITIONS,
@@ -26,6 +26,9 @@ import {
   type CopyCondition,
   type CopyStatus,
 } from '@/lib/catalog'
+
+/** Statuses staff can set by hand; circulation owns the rest. */
+const MANUAL_STATUSES: CopyStatus[] = ['Available', 'Lost', 'Damaged', 'Withdrawn']
 
 const STATUS_VARIANT: Record<CopyStatus, 'success' | 'brass' | 'neutral' | 'danger'> = {
   Available: 'success',
@@ -296,10 +299,20 @@ function WaitlistCard({ book }: { book: BookDetails }) {
 
 export function BookDetailsPage() {
   const { id } = useParams<{ id: string }>()
+  const queryClient = useQueryClient()
   const book = useQuery({
     queryKey: ['book', id],
     queryFn: () => getBook(id!),
     enabled: !!id,
+  })
+
+  const statusMutation = useMutation({
+    mutationFn: ({ copyId, status }: { copyId: string; status: CopyStatus }) => setCopyStatus(copyId, status),
+    onSuccess: (_, vars) => {
+      toast.success(`Copy marked ${vars.status}`)
+      void queryClient.invalidateQueries({ queryKey: ['book', id] })
+    },
+    onError: (error: Error) => toast.error('Could not change status', { description: error.message }),
   })
 
   if (book.isPending) {
@@ -424,7 +437,25 @@ export function BookDetailsPage() {
                         {copy.price != null ? copy.price.toFixed(2) : <span className="text-faint">—</span>}
                       </td>
                       <td className="px-4 py-2.5">
-                        <Badge variant={STATUS_VARIANT[copy.status]}>{copy.status}</Badge>
+                        {MANUAL_STATUSES.includes(copy.status) ? (
+                          <Select
+                            aria-label={`Status of copy ${copy.barcode}`}
+                            className="h-8 w-32 text-[13px]"
+                            value={copy.status}
+                            disabled={statusMutation.isPending}
+                            onChange={(e) =>
+                              statusMutation.mutate({ copyId: copy.id, status: e.target.value as CopyStatus })
+                            }
+                          >
+                            {MANUAL_STATUSES.map((s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            ))}
+                          </Select>
+                        ) : (
+                          <Badge variant={STATUS_VARIANT[copy.status]}>{copy.status}</Badge>
+                        )}
                       </td>
                     </tr>
                   ))}

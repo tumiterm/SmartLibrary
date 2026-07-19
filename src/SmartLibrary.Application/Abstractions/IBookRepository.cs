@@ -16,13 +16,19 @@ public interface IBookRepository
 
     Task<BookCopy?> GetCopyByBarcodeAsync(string barcode, CancellationToken cancellationToken);
 
+    Task<BookCopy?> GetCopyByIdAsync(Guid copyId, CancellationToken cancellationToken);
+
     /// <summary>Paged catalog search over title/authors/ISBN, with copies loaded. Newest first.</summary>
     Task<(IReadOnlyList<Book> Books, int TotalCount)> SearchAsync(
         string? search,
         BookFormat? format,
+        Guid? branchId,
         int page,
         int pageSize,
         CancellationToken cancellationToken);
+
+    /// <summary>Copies whose barcode matches, with book loaded. For global search.</summary>
+    Task<IReadOnlyList<BookCopy>> SearchCopiesByBarcodeAsync(string barcode, int limit, CancellationToken cancellationToken);
 
     void Add(Book book);
 

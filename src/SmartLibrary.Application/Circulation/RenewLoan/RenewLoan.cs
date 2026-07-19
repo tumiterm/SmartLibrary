@@ -1,6 +1,5 @@
 using FluentValidation;
 using MediatR;
-using Microsoft.Extensions.Options;
 using SmartLibrary.Application.Abstractions;
 using SmartLibrary.Application.Common.Exceptions;
 
@@ -20,12 +19,12 @@ public sealed class RenewLoanCommandHandler(
     ILoanRepository loans,
     IHoldRepository holds,
     IUnitOfWork unitOfWork,
-    IOptions<CirculationOptions> options)
+    ICirculationPolicyProvider policyProvider)
     : IRequestHandler<RenewLoanCommand, LoanDto>
 {
     public async Task<LoanDto> Handle(RenewLoanCommand request, CancellationToken cancellationToken)
     {
-        var policy = options.Value;
+        var policy = await policyProvider.GetAsync(cancellationToken);
         var loan = await loans.GetActiveByCopyBarcodeAsync(request.Barcode.Trim(), cancellationToken)
             ?? throw new NotFoundException($"No copy with barcode {request.Barcode} is currently on loan.");
 

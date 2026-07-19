@@ -12,6 +12,7 @@ public sealed class FineConfiguration : IEntityTypeConfiguration<Fine>
         builder.IsMultiTenant();
 
         builder.Property(f => f.Amount).HasPrecision(10, 2);
+        builder.Property(f => f.Notes).HasMaxLength(500);
         builder.Property(f => f.CreatedBy).HasMaxLength(200);
         builder.Property(f => f.UpdatedBy).HasMaxLength(200);
 
