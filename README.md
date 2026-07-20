@@ -41,7 +41,8 @@ Dependencies point inward only: `Api → Infrastructure → Application → Doma
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/v1/books/isbn/{isbn}` | Lookup flow: local DB → Google Books → `NotFound` (manual entry). **External hits are snapshotted into the catalog automatically** — an ISBN never hits Google twice per tenant. Returns availability counts. |
+| `GET /api/v1/books/isbn/{isbn}` | Lookup chain: local DB → Google Books → **Open Library** → `NotFound` (manual entry). External hits are snapshotted automatically with their source recorded; an ISBN never hits the same external API twice per tenant. |
+| `POST /api/v1/books/{id}/asset` + `GET .../asset/view` | Soft copy upload (PDF, max 60 MB, per-tenant disk storage) and the guarded stream: `no-store`, inline-only, consumed exclusively by the in-app view-only reader (pdf.js canvas — no download/print/text-selection, dynamic watermark). Deterrence, not absolute DRM. |
 | `GET /api/v1/books/{id}` | Full record: metadata, cover, classification, copies per branch with availability, borrow history (empty until circulation). |
 | `POST /api/v1/books` | Manual entry (the final fallback). 409 on duplicate ISBN. |
 | `PUT /api/v1/books/{id}` | Complete/correct a record (e.g. right after an external lookup cached it). ISBN immutable. |

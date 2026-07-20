@@ -97,7 +97,7 @@ public sealed class LookupBookByIsbnQueryHandler(
                 Language = external.Language,
                 Categories = [.. external.Categories],
                 CoverImageUrl = external.CoverImageUrl,
-                MetadataSource = MetadataSource.GoogleBooks,
+                MetadataSource = external.Source,
             };
 
             books.Add(cached);

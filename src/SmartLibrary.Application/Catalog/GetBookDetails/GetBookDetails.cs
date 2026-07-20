@@ -11,6 +11,7 @@ public sealed class GetBookDetailsQueryHandler(
     IBookRepository books,
     ILoanRepository loans,
     IHoldRepository holds,
+    IDigitalAssetRepository digitalAssets,
     HoldExpiryService holdExpiry,
     IUnitOfWork unitOfWork,
     ICirculationPolicyProvider policyProvider)
@@ -30,6 +31,7 @@ public sealed class GetBookDetailsQueryHandler(
         var history = await loans.GetByBookAsync(book.Id, limit: 20, cancellationToken);
         var queue = await holds.GetQueueByBookAsync(book.Id, cancellationToken);
         var policy = await policyProvider.GetAsync(cancellationToken);
+        var asset = await digitalAssets.GetByBookAsync(book.Id, cancellationToken);
 
         return BookDetailsDto.FromEntity(
             book,
@@ -46,6 +48,7 @@ public sealed class GetBookDetailsQueryHandler(
                 h.Status.ToString(),
                 h.PlacedAtUtc,
                 i + 1))],
-            policy.LowStockThreshold);
+            policy.LowStockThreshold,
+            asset);
     }
 }

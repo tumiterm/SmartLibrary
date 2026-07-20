@@ -14,6 +14,7 @@ import { RegisterMemberPage } from '@/pages/register-member-page'
 import { OpacBookPage } from '@/pages/opac/opac-book-page'
 import { OpacHomePage } from '@/pages/opac/opac-home-page'
 import { OpacShell } from '@/pages/opac/opac-shell'
+import { ReaderPage } from '@/pages/reader-page'
 import { ReportsPage } from '@/pages/reports-page'
 import { SettingsPage } from '@/pages/settings-page'
 import { StocktakePage } from '@/pages/stocktake-page'
@@ -31,6 +32,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
+            <Route path="catalog/books/:id/read" element={<ReaderPage />} />
             <Route path="opac" element={<OpacShell />}>
               <Route index element={<OpacHomePage />} />
               <Route path="books/:id" element={<OpacBookPage />} />

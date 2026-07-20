@@ -126,6 +126,9 @@ export interface BookDetails {
   copiesTotal: number
   copiesAvailable: number
   isLowStock: boolean
+  hasDigitalAsset: boolean
+  digitalAssetName: string | null
+  digitalAssetSizeBytes: number | null
   copies: BookCopy[]
   borrowHistory: LoanSummary[]
   holds: HoldQueueItem[]

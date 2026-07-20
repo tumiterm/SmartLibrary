@@ -5,4 +5,5 @@ public enum MetadataSource
 {
     Manual = 0,
     GoogleBooks = 1,
+    OpenLibrary = 2,
 }

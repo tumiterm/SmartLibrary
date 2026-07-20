@@ -36,7 +36,8 @@ public class LookupBookByIsbnQueryHandlerTests
     {
         var external = new ExternalBookMetadata(
             KnownIsbn, null, "External Book", null, ["Author"], "Publisher",
-            "2020", "Description", 123, "en", ["Category"], "https://covers/img.jpg");
+            "2020", "Description", 123, "en", ["Category"], "https://covers/img.jpg",
+            MetadataSource.GoogleBooks);
         var repository = new FakeBookRepository(null);
         var unitOfWork = new FakeUnitOfWork();
         var handler = new LookupBookByIsbnQueryHandler(

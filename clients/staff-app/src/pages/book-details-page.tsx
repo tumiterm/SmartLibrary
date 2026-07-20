@@ -2,14 +2,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   BookMarked,
+  BookOpenText,
   Building2,
+  FileUp,
   History,
   Hourglass,
   IdCard,
   Plus,
 } from 'lucide-react'
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useRef, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,7 +19,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input, Select } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
-import { addCopy, cancelHold, createBranch, getBook, getBranches, placeHold, setCopyStatus } from '@/lib/api'
+import {
+  addCopy,
+  cancelHold,
+  createBranch,
+  getBook,
+  getBranches,
+  placeHold,
+  setCopyStatus,
+  uploadBookAsset,
+} from '@/lib/api'
 import {
   BOOK_FORMATS,
   COPY_CONDITIONS,
@@ -198,6 +209,79 @@ function AddCopyForm({ book }: { book: BookDetails }) {
         </Button>
       </div>
     </form>
+  )
+}
+
+/* ── Digital copy ─────────────────────────────────────────────────────────── */
+
+function DigitalCopyCard({ book }: { book: BookDetails }) {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const upload = useMutation({
+    mutationFn: (file: File) => uploadBookAsset(book.id, file),
+    onSuccess: (info) => {
+      toast.success('Soft copy uploaded', { description: info.fileName })
+      void queryClient.invalidateQueries({ queryKey: ['book', book.id] })
+    },
+    onError: (error: Error) => toast.error('Upload failed', { description: error.message }),
+  })
+
+  const sizeLabel =
+    book.digitalAssetSizeBytes != null ? `${(book.digitalAssetSizeBytes / 1024 / 1024).toFixed(1)} MB` : null
+
+  return (
+    <Card className="animate-rise">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <BookOpenText className="size-4 text-accent" />
+          Digital copy
+        </CardTitle>
+        <CardDescription>
+          Read-only in the built-in viewer — patrons and staff never get a download link.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-wrap items-center gap-3">
+        {book.hasDigitalAsset ? (
+          <>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{book.digitalAssetName}</p>
+              <p className="text-xs text-muted">PDF{sizeLabel ? ` · ${sizeLabel}` : ''} · view-only</p>
+            </div>
+            <Button onClick={() => navigate(`/catalog/books/${book.id}/read`)}>
+              <BookOpenText className="size-4" />
+              Read
+            </Button>
+            <Button variant="ghost" disabled={upload.isPending} onClick={() => fileRef.current?.click()}>
+              {upload.isPending ? <Spinner /> : <FileUp className="size-4" />}
+              Replace
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="min-w-0 flex-1 text-sm text-muted">
+              No soft copy yet. Upload a PDF (max 60 MB) to make this title readable on-system.
+            </p>
+            <Button variant="secondary" disabled={upload.isPending} onClick={() => fileRef.current?.click()}>
+              {upload.isPending ? <Spinner /> : <FileUp className="size-4" />}
+              Upload PDF
+            </Button>
+          </>
+        )}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/pdf"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) upload.mutate(file)
+            e.target.value = ''
+          }}
+        />
+      </CardContent>
+    </Card>
   )
 }
 
@@ -473,6 +557,9 @@ export function BookDetailsPage() {
           <AddCopyForm book={b} />
         </CardContent>
       </Card>
+
+      {/* ── Digital copy ── */}
+      {(b.hasDigitalAsset || !isPhysical(b.format)) && <DigitalCopyCard book={b} />}
 
       {/* ── Waitlist ── */}
       <WaitlistCard book={b} />

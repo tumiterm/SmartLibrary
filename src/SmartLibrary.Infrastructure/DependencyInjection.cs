@@ -40,13 +40,30 @@ public static class DependencyInjection
         services.AddScoped<ICirculationPolicyProvider, CirculationPolicyProvider>();
 
         services.Configure<GoogleBooksOptions>(configuration.GetSection(GoogleBooksOptions.SectionName));
-        services.AddHttpClient<IBookMetadataProvider, GoogleBooksMetadataProvider>(client =>
+        services.AddHttpClient<GoogleBooksMetadataProvider>(client =>
             {
                 client.BaseAddress = new Uri(
                     configuration[$"{GoogleBooksOptions.SectionName}:BaseUrl"] ?? "https://www.googleapis.com/books/v1/");
                 client.Timeout = TimeSpan.FromSeconds(10);
             })
             .AddStandardResilienceHandler();
+
+        services.AddHttpClient<OpenLibraryMetadataProvider>(client =>
+            {
+                client.BaseAddress = new Uri(configuration["OpenLibrary:BaseUrl"] ?? "https://openlibrary.org/");
+                client.Timeout = TimeSpan.FromSeconds(10);
+            })
+            .AddStandardResilienceHandler();
+
+        // The lookup chain: Google Books first, Open Library as the fallback.
+        services.AddScoped<IBookMetadataProvider>(sp => new CompositeMetadataProvider(
+        [
+            sp.GetRequiredService<GoogleBooksMetadataProvider>(),
+            sp.GetRequiredService<OpenLibraryMetadataProvider>(),
+        ]));
+
+        services.AddScoped<IFileStorage, LocalFileStorage>();
+        services.AddScoped<IDigitalAssetRepository, DigitalAssetRepository>();
 
         return services;
     }

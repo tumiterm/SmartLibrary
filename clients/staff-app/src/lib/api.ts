@@ -227,6 +227,41 @@ export function completeStocktake(stocktakeId: string): Promise<StocktakeReport>
   })
 }
 
+export async function uploadBookAsset(
+  bookId: string,
+  file: File,
+): Promise<{ fileName: string; sizeBytes: number }> {
+  const form = new FormData()
+  form.append('file', file)
+  // No Content-Type header — the browser sets the multipart boundary itself.
+  const response = await fetch(`${BASE}/books/${bookId}/asset`, {
+    method: 'POST',
+    headers: { 'X-Tenant': TENANT },
+    body: form,
+  })
+  if (!response.ok) {
+    let problem = null
+    try {
+      problem = await response.json()
+    } catch {
+      // Non-JSON error body.
+    }
+    throw new ApiError(response.status, problem)
+  }
+  return (await response.json()) as { fileName: string; sizeBytes: number }
+}
+
+/** Fetches the protected PDF bytes for the in-app reader (never a download link). */
+export async function fetchBookAssetData(bookId: string): Promise<ArrayBuffer> {
+  const response = await fetch(`${BASE}/books/${bookId}/asset/view`, {
+    headers: { 'X-Tenant': TENANT },
+  })
+  if (!response.ok) {
+    throw new ApiError(response.status, null)
+  }
+  return response.arrayBuffer()
+}
+
 export function opacSearch(params: {
   search?: string
   format?: BookFormat | ''

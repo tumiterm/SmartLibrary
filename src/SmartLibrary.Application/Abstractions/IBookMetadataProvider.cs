@@ -1,8 +1,11 @@
+using SmartLibrary.Domain.Catalog;
+
 namespace SmartLibrary.Application.Abstractions;
 
 /// <summary>
-/// External bibliographic data source (Google Books). Used only to prefill metadata —
-/// never as storage. Returns null when the source has no match for the ISBN.
+/// External bibliographic data source (Google Books, OpenLibrary…). Used only to
+/// prefill metadata — never as storage. Returns null when the source has no match.
+/// Implementations are tried in order; the first hit wins and reports its Source.
 /// </summary>
 public interface IBookMetadataProvider
 {
@@ -21,4 +24,5 @@ public sealed record ExternalBookMetadata(
     int? PageCount,
     string? Language,
     IReadOnlyList<string> Categories,
-    string? CoverImageUrl);
+    string? CoverImageUrl,
+    MetadataSource Source);

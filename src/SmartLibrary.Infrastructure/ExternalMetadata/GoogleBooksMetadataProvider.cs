@@ -67,7 +67,8 @@ public sealed partial class GoogleBooksMetadataProvider(
             PageCount: volumeInfo.PageCount,
             Language: volumeInfo.Language,
             Categories: volumeInfo.Categories ?? [],
-            CoverImageUrl: volumeInfo.ImageLinks?.Thumbnail ?? volumeInfo.ImageLinks?.SmallThumbnail);
+            CoverImageUrl: volumeInfo.ImageLinks?.Thumbnail ?? volumeInfo.ImageLinks?.SmallThumbnail,
+            Source: SmartLibrary.Domain.Catalog.MetadataSource.GoogleBooks);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Google Books returned no usable volume for ISBN {Isbn13}")]

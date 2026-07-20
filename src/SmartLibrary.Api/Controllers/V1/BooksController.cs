@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using SmartLibrary.Application.Catalog;
 using SmartLibrary.Application.Catalog.AddBook;
 using SmartLibrary.Application.Catalog.AddBookCopy;
+using SmartLibrary.Application.Catalog.DigitalAssets;
 using SmartLibrary.Application.Catalog.GetBookDetails;
 using SmartLibrary.Application.Catalog.Lookup;
 using SmartLibrary.Application.Catalog.SearchBooks;
@@ -127,6 +128,43 @@ public sealed class BooksController(ISender sender) : ControllerBase
             cancellationToken);
 
         return CreatedAtAction(nameof(GetById), new { id, version = "1" }, new { id = copyId });
+    }
+
+    /// <summary>Uploads (or replaces) the title's soft copy. PDF only for now, max 60 MB.</summary>
+    [HttpPost("{id:guid}/asset")]
+    [RequestSizeLimit(70_000_000)]
+    [ProducesResponseType<DigitalAssetInfoDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<DigitalAssetInfoDto>> UploadAsset(
+        Guid id,
+        IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = file.OpenReadStream();
+        var info = await sender.Send(
+            new UploadDigitalAssetCommand(id, file.FileName, file.ContentType, file.Length, stream),
+            cancellationToken);
+
+        return Ok(info);
+    }
+
+    /// <summary>
+    /// Streams the soft copy for the in-app reader. Inline, no-store, no download
+    /// disposition — the file is never offered as a download.
+    /// </summary>
+    [HttpGet("{id:guid}/asset/view")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> ViewAsset(Guid id, CancellationToken cancellationToken)
+    {
+        var asset = await sender.Send(new GetDigitalAssetQuery(id), cancellationToken);
+
+        Response.Headers.CacheControl = "no-store, max-age=0";
+        Response.Headers["Content-Disposition"] = "inline";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+
+        return File(asset.Content, asset.ContentType);
     }
 
     /// <summary>Marks a copy Lost/Damaged/Withdrawn, or restores it to Available.</summary>

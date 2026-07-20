@@ -52,6 +52,9 @@ public sealed record BookDetailsDto(
     int CopiesTotal,
     int CopiesAvailable,
     bool IsLowStock,
+    bool HasDigitalAsset,
+    string? DigitalAssetName,
+    long? DigitalAssetSizeBytes,
     IReadOnlyList<BookCopyDto> Copies,
     IReadOnlyList<LoanSummaryDto> BorrowHistory,
     IReadOnlyList<HoldQueueItemDto> Holds)
@@ -60,7 +63,8 @@ public sealed record BookDetailsDto(
         Book book,
         IReadOnlyList<LoanSummaryDto>? borrowHistory = null,
         IReadOnlyList<HoldQueueItemDto>? holds = null,
-        int? lowStockThreshold = null)
+        int? lowStockThreshold = null,
+        DigitalAsset? digitalAsset = null)
     {
         var copies = book.Copies
             .OrderBy(c => c.AcquiredAtUtc)
@@ -102,6 +106,9 @@ public sealed record BookDetailsDto(
             CopiesTotal: copies.Count,
             CopiesAvailable: available,
             IsLowStock: lowStockThreshold is { } threshold && copies.Count > 0 && available <= threshold,
+            HasDigitalAsset: digitalAsset is not null,
+            DigitalAssetName: digitalAsset?.FileName,
+            DigitalAssetSizeBytes: digitalAsset?.SizeBytes,
             Copies: copies,
             BorrowHistory: borrowHistory ?? [],
             Holds: holds ?? []);
