@@ -9,6 +9,7 @@ import {
   Users,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { getDashboard } from '@/lib/api'
@@ -221,7 +222,19 @@ export function DashboardPage() {
           </div>
         </>
       ) : (
-        <p className="text-sm text-muted">Could not load the dashboard.</p>
+        <Card className="animate-rise border-danger/30">
+          <CardContent className="flex flex-col items-start gap-3">
+            <p className="font-medium text-danger">Can't reach the API</p>
+            <p className="max-w-md text-sm leading-relaxed text-muted">
+              The dashboard couldn't load from <span className="font-mono text-[13px]">/api/v1/dashboard</span>.
+              Make sure <span className="font-medium text-ink">SmartLibrary.Api</span> is running
+              (F5 in Visual Studio starts both the API and this app).
+            </p>
+            <Button variant="secondary" size="sm" onClick={() => dashboard.refetch()}>
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

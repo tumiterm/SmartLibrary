@@ -186,3 +186,31 @@ export const COPY_CONDITIONS: CopyCondition[] = ['New', 'Good', 'Fair', 'Poor']
 export function isPhysical(format: BookFormat): boolean {
   return format === 'Print' || format === 'Other'
 }
+
+export interface BranchAvailability {
+  branchName: string
+  available: number
+  total: number
+}
+
+/** Patron-facing title view — no borrower data, no barcodes. */
+export interface PublicBookDetails {
+  id: string
+  isbn13: string | null
+  title: string
+  subtitle: string | null
+  authors: string[]
+  publisher: string | null
+  publishedDate: string | null
+  description: string | null
+  pageCount: number | null
+  language: string | null
+  categories: string[]
+  coverImageUrl: string | null
+  format: BookFormat
+  isReferenceOnly: boolean
+  copiesTotal: number
+  copiesAvailable: number
+  waitlistCount: number
+  availability: BranchAvailability[]
+}

@@ -12,6 +12,9 @@ export default defineConfig({
     },
   },
   server: {
+    // Deterministic port — the API's SPA proxy and docs point at 5173.
+    strictPort: true,
+    port: 5173,
     proxy: {
       // Proxy API calls to the SmartLibrary.Api dev server — no CORS in dev.
       '/api': 'http://localhost:5205',

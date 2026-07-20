@@ -64,6 +64,8 @@ Dependencies point inward only: `Api → Infrastructure → Application → Doma
 | `GET/PUT /api/v1/settings` | **Per-tenant library rules** (loan days, fine rate, caps, pickup window) overriding platform defaults. |
 | `GET /api/v1/dashboard` | Stats + recent circulation activity. |
 | `GET /api/v1/search?q=` | Global search: books (title/author/ISBN), copies (barcode), members (name/card/email). |
+| `GET /api/v1/reports/circulation?from&to`, `/inventory`, `/fines?from&to` | Reports on screen, or `format=csv` for a download. |
+| `GET /api/v1/opac/books`, `/opac/books/{id}` | **Public catalog** (patron-facing UI at `/opac`): search + title view with per-branch availability and waitlist size. Never exposes borrower names or barcodes. |
 | `GET /health` | Liveness. |
 
 Platform-default circulation policy lives in the `Circulation` section of appsettings;
@@ -100,6 +102,13 @@ npm run dev        # http://localhost:5173
 ```
 
 ## Running locally
+
+**Visual Studio:** set `SmartLibrary.Api` as the startup project and press F5. The SPA proxy
+launches the Vite dev server automatically and opens the browser on http://localhost:5173.
+(Requires Node.js on PATH — restart VS after installing Node. Use the `api-only` launch
+profile to run the API without the frontend.)
+
+**CLI:**
 
 ```
 dotnet run --project src/SmartLibrary.Api --launch-profile http

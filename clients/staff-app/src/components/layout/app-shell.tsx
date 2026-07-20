@@ -38,7 +38,7 @@ const NAV: NavItem[] = [
   { label: 'Circulation', to: '/circulation', icon: ArrowLeftRight },
   { label: 'Stocktake', to: '/stocktake', icon: ClipboardList },
   { label: 'Patrons', to: '/patrons', icon: Users },
-  { label: 'Reports', to: '/reports', icon: BarChart3, soon: true },
+  { label: 'Reports', to: '/reports', icon: BarChart3 },
   { label: 'Settings', to: '/settings', icon: Settings },
 ]
 

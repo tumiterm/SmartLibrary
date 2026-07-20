@@ -94,8 +94,12 @@ try
         app.MapOpenApi();
         app.MapScalarApiReference();
     }
-
-    app.UseHttpsRedirection();
+    else
+    {
+        // In dev the Vite proxy talks plain HTTP to :5205; redirecting those calls to
+        // the https port turns them into cross-origin requests and breaks the SPA.
+        app.UseHttpsRedirection();
+    }
     app.UseAuthentication();
     app.UseAuthorization();
 

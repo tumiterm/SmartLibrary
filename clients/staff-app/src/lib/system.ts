@@ -70,3 +70,75 @@ export interface GlobalSearchResult {
   copies: SearchCopyHit[]
   members: SearchMemberHit[]
 }
+
+export interface TopItem {
+  id: string
+  label: string
+  count: number
+}
+
+export interface CirculationRow {
+  borrowedAtUtc: string
+  dueAtUtc: string
+  returnedAtUtc: string | null
+  daysLate: number | null
+  bookTitle: string
+  barcode: string
+  memberName: string
+  membershipNumber: string
+}
+
+export interface CirculationReport {
+  fromUtc: string
+  toUtc: string
+  checkouts: number
+  returns: number
+  lateReturns: number
+  activeLoansNow: number
+  overdueNow: number
+  topTitles: TopItem[]
+  topMembers: TopItem[]
+  rows: CirculationRow[]
+}
+
+export interface CountRow {
+  label: string
+  count: number
+}
+
+export interface BranchInventoryRow {
+  branchName: string
+  copies: number
+  available: number
+  onLoan: number
+  other: number
+}
+
+export interface InventoryReport {
+  titles: number
+  copies: number
+  byStatus: CountRow[]
+  byFormat: CountRow[]
+  byBranch: BranchInventoryRow[]
+}
+
+export interface FineRow {
+  assessedAtUtc: string
+  memberName: string
+  membershipNumber: string
+  reason: string
+  amount: number
+  status: string
+  bookTitle: string | null
+  notes: string | null
+}
+
+export interface FinesReport {
+  fromUtc: string
+  toUtc: string
+  assessedTotal: number
+  paidTotal: number
+  waivedTotal: number
+  outstandingNow: number
+  rows: FineRow[]
+}

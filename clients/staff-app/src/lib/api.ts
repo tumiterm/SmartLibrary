@@ -8,6 +8,7 @@ import type {
   BookLookupResult,
   Branch,
   PagedResult,
+  PublicBookDetails,
 } from './catalog'
 import type {
   CheckoutResult,
@@ -26,7 +27,14 @@ import type {
 } from './circulation'
 import type { CopyCondition, CopyStatus } from './catalog'
 import type { Member, MemberStatus, RegisterMemberRequest } from './members'
-import type { Dashboard, GlobalSearchResult, LibrarySettings } from './system'
+import type {
+  CirculationReport,
+  Dashboard,
+  FinesReport,
+  GlobalSearchResult,
+  InventoryReport,
+  LibrarySettings,
+} from './system'
 
 const BASE = '/api/v1'
 
@@ -217,6 +225,62 @@ export function completeStocktake(stocktakeId: string): Promise<StocktakeReport>
   return request<StocktakeReport>(`/stocktakes/${stocktakeId}/complete`, {
     method: 'POST',
   })
+}
+
+export function opacSearch(params: {
+  search?: string
+  format?: BookFormat | ''
+  page?: number
+}): Promise<PagedResult<BookListItem>> {
+  const qs = new URLSearchParams()
+  if (params.search) qs.set('search', params.search)
+  if (params.format) qs.set('format', params.format)
+  if (params.page) qs.set('page', String(params.page))
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  return request<PagedResult<BookListItem>>(`/opac/books${suffix}`)
+}
+
+export function opacBook(id: string): Promise<PublicBookDetails> {
+  return request<PublicBookDetails>(`/opac/books/${id}`)
+}
+
+export function getCirculationReport(from: string, to: string): Promise<CirculationReport> {
+  return request<CirculationReport>(`/reports/circulation?from=${from}&to=${to}`)
+}
+
+export function getInventoryReport(): Promise<InventoryReport> {
+  return request<InventoryReport>('/reports/inventory')
+}
+
+export function getFinesReport(from: string, to: string): Promise<FinesReport> {
+  return request<FinesReport>(`/reports/fines?from=${from}&to=${to}`)
+}
+
+/** Fetches a CSV export (tenant header required) and triggers a browser download. */
+export async function downloadReportCsv(
+  path: 'circulation' | 'inventory' | 'fines',
+  params: { from?: string; to?: string },
+): Promise<void> {
+  const qs = new URLSearchParams({ format: 'csv' })
+  if (params.from) qs.set('from', params.from)
+  if (params.to) qs.set('to', params.to)
+
+  const response = await fetch(`${BASE}/reports/${path}?${qs.toString()}`, {
+    headers: { 'X-Tenant': TENANT },
+  })
+  if (!response.ok) {
+    throw new ApiError(response.status, null)
+  }
+
+  const blob = await response.blob()
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)/i.exec(disposition)
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = match?.[1] ?? `${path}.csv`
+  anchor.click()
+  URL.revokeObjectURL(url)
 }
 
 export function settleFine(fineId: string, waive: boolean, reason?: string): Promise<Fine> {
